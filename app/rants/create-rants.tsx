@@ -1,0 +1,102 @@
+import React, { useState } from "react";
+import { Pressable, ScrollView, TextInput, View } from "react-native";
+import { useRouter } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { AppText } from "../../components/AppText";
+import {
+  SafeAreaView,
+  SafeAreaProvider,
+  SafeAreaInsetsContext,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+const categories = ["Campus Life", "Cafeteria", "Academics", "Dorms", "Spots"];
+
+export default function CreateRantScreen() {
+  const router = useRouter();
+  const [activeCategory, setActiveCategory] = useState(categories[0]);
+  const [text, setText] = useState("");
+
+  return (
+    <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
+      <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+        <Pressable onPress={() => router.back()}>
+          <AppText className="text-base text-slate-500 dark:text-slate-400">
+            Cancel
+          </AppText>
+        </Pressable>
+        <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          New Rant
+        </AppText>
+        <View className="w-14" />
+      </View>
+
+      <ScrollView contentContainerClassName="px-5 pt-4 pb-6">
+        <AppText className="text-xs tracking-widest text-slate-400 dark:text-slate-500">
+          SELECT A CATEGORY
+        </AppText>
+
+        <View className="flex-row flex-wrap gap-3 mt-3">
+          {categories.map((category) => {
+            const active = category === activeCategory;
+            return (
+              <Pressable
+                key={category}
+                onPress={() => setActiveCategory(category)}
+                className={`px-4 py-2.5 rounded-full border ${
+                  active
+                    ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
+                    : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
+                }`}
+              >
+                <AppText
+                  className={`text-sm font-semibold ${
+                    active
+                      ? "text-white dark:text-slate-950"
+                      : "text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {category}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View className="mt-6">
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Spill the tea... (respectfully). What's happening on campus today?"
+            placeholderTextColor="#CBD5F5"
+            multiline
+            className="min-h-[240px] text-base leading-6 text-slate-900 dark:text-slate-100"
+          />
+          <View className="mt-2 h-[1px] bg-slate-200 dark:bg-slate-800" />
+          <View className="flex-row items-center justify-end mt-2">
+            <AppText className="text-sm text-slate-400 dark:text-slate-500">
+              {text.length}/280
+            </AppText>
+          </View>
+        </View>
+
+        <View className="flex-row items-center mt-6">
+          <Ionicons name="lock-closed" size={18} color="#16A34A" />
+          <AppText className="ml-2 text-sm text-slate-600 dark:text-slate-300">
+            Your rant is 100% anonymous & untraceable.
+          </AppText>
+        </View>
+      </ScrollView>
+
+      <View className="px-5 pb-6">
+        <Pressable className="bg-green-600 dark:bg-green-400 rounded-2xl py-4 items-center justify-center shadow-lg">
+          <View className="flex-row items-center gap-2">
+            <AppText className="text-base font-semibold text-white dark:text-slate-950">
+              Post Rant
+            </AppText>
+            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+          </View>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+}
