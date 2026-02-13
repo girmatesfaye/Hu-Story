@@ -38,6 +38,10 @@ export default function RootLayout() {
           options={{ headerShown: false }}
         />
         <Stack.Screen name="spots/[id]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="spots/create-spots"
+          options={{ headerShown: false }}
+        />
       </Stack>
       <StatusBar style={statusBarStyle} />
     </View>
