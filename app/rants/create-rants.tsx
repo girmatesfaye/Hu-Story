@@ -3,6 +3,8 @@ import { Pressable, ScrollView, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "../../components/AppText";
+import Feather from "@expo/vector-icons/Feather";
+
 import {
   SafeAreaView,
   SafeAreaProvider,
@@ -19,13 +21,15 @@ export default function CreateRantScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-        <Pressable onPress={() => router.back()}>
-          <AppText className="text-base text-slate-500 dark:text-slate-400">
-            Cancel
-          </AppText>
+        <Pressable
+          onPress={() => router.back()}
+          className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+        >
+          <Feather name="arrow-left" size={24} color="black" />{" "}
         </Pressable>
+
         <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          New Rant
+          Rew Rants
         </AppText>
         <View className="w-14" />
       </View>

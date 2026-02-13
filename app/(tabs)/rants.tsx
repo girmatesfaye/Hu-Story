@@ -24,7 +24,27 @@ const rants = [
     comments: 12,
   },
   {
+    id: "2",
+    name: "Anonymous ",
+    time: "2h ago",
+    tag: "Academics",
+    content:
+      "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
+    votes: 45,
+    comments: 12,
+  },
+  {
     id: "3",
+    name: "Anonymous Student",
+    time: "2h ago",
+    tag: "Academics",
+    content:
+      "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
+    votes: 45,
+    comments: 12,
+  },
+  {
+    id: "4",
     name: "Anonymous ",
     time: "2h ago",
     tag: "Academics",

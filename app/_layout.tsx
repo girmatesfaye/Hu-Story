@@ -32,6 +32,12 @@ export default function RootLayout() {
           name="rants/create-rants"
           options={{ headerShown: false }}
         />
+        <Stack.Screen name="events/[id]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="events/create-events"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen name="spots/[id]" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style={statusBarStyle} />
     </View>
