@@ -188,7 +188,10 @@ export default function SpotDetailsScreen() {
         </ScrollView>
 
         <View className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
-          <Pressable className="flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3">
+          <Pressable
+            onPress={() => router.push("/spots/add-review")}
+            className="flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3"
+          >
             <Ionicons name="create-outline" size={18} color="#FFFFFF" />
             <AppText className="text-sm font-semibold text-white">
               Add Review

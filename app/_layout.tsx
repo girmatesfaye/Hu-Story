@@ -52,6 +52,10 @@ export default function RootLayout() {
           name="notifications/notification"
           options={{ headerShown: false }}
         />
+        <Stack.Screen
+          name="spots/add-review"
+          options={{ headerShown: false }}
+        />
       </Stack>
       <StatusBar style={statusBarStyle} />
     </View>
