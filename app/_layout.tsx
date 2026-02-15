@@ -48,7 +48,6 @@ export default function RootLayout() {
           name="projects/create-projects"
           options={{ headerShown: false }}
         />
-        <Stack.Screen name="profile" options={{ headerShown: false }} />
         <Stack.Screen
           name="notifications/notification"
           options={{ headerShown: false }}
@@ -57,12 +56,12 @@ export default function RootLayout() {
           name="spots/add-review"
           options={{ headerShown: false }}
         />
-        <Stack.Screen
-          name="projects/add-review"
-          options={{ headerShown: false }}
-        />
         <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="profiles/edit-profile"
+          options={{ headerShown: false }}
+        />
       </Stack>
       <StatusBar style={statusBarStyle} />
     </View>

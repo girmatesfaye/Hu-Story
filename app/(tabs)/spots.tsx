@@ -5,7 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
-
+import { useColorScheme } from "react-native";
 const categories = [
   { id: "c1", label: "All", active: true },
   { id: "c2", label: "Food" },
@@ -87,7 +87,13 @@ const tagToneStyles: Record<string, { container: string; text: string }> = {
 export default function SpotsTabScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-
+  const scheme = useColorScheme();
+  const iconColors = {
+    text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
+    muted: scheme === "dark" ? "#94A3B8" : "#64748B",
+    accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
+    chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
+  };
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
       <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
@@ -96,12 +102,19 @@ export default function SpotsTabScreen() {
             <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
               Campus Spots
             </AppText>
-            <AppText className="mt-1 text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-              Hawassa University
+            <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">
+              Find and share the best places around campus.
             </AppText>
           </View>
-          <Pressable className="h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-400/20">
-            <Ionicons name="person" size={20} color={colors.accent} />
+          <Pressable
+            onPress={() => router.push("../notifications/notification")}
+            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={22}
+              color={iconColors.text}
+            />
           </Pressable>
         </View>
 

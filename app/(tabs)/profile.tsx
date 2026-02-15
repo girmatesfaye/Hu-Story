@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
+import { router } from "expo-router";
 
 export default function ProfileTabScreen() {
   const { colors, statusBarStyle } = useTheme();
@@ -52,6 +53,7 @@ export default function ProfileTabScreen() {
             <TouchableOpacity
               className="absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full bg-emerald-600 shadow-md"
               accessibilityRole="button"
+              onPress={() => router.push("/profiles/edit-profile")}
             >
               <Ionicons name="pencil" size={16} color="#FFFFFF" />
             </TouchableOpacity>

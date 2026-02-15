@@ -28,10 +28,10 @@ export default function ProjectsTabScreen() {
       >
         <View className="flex-row items-start justify-between">
           <View className="flex-1 pr-4">
-            <AppText className="text-3xl font-semibold text-slate-900 dark:text-slate-100">
+            <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
               Campus Projects
             </AppText>
-            <AppText className="mt-2 text-base text-slate-500 dark:text-slate-400">
+            <AppText className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Discover what peers are building
             </AppText>
           </View>

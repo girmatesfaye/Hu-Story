@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
+import { useColorScheme } from "react-native";
 
 const dateChips = [
   { id: "d1", day: "OCT", date: "12", active: true },
@@ -198,25 +199,35 @@ export default function EventTabScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const iconColor = colors.mutedStrong;
+  const scheme = useColorScheme();
+
+  const iconColors = {
+    text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
+    muted: scheme === "dark" ? "#94A3B8" : "#64748B",
+    accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
+    chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
+  };
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
       <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
         <View className="flex-row items-center justify-between">
           <View>
-            <AppText className="text-sm text-slate-500 dark:text-slate-400">
-              Hawassa University
-            </AppText>
             <AppText className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
               Upcoming Events
             </AppText>
+            <AppText className="text-sm text-slate-500 dark:text-slate-400">
+              Discover what's happening around campus
+            </AppText>
           </View>
-
-          <Pressable className="h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <Pressable
+            onPress={() => router.push("../notifications/notification")}
+            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+          >
             <Ionicons
               name="notifications-outline"
-              size={20}
-              color={colors.text}
+              size={22}
+              color={iconColors.text}
             />
           </Pressable>
         </View>

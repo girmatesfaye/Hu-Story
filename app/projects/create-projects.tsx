@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
-
+import { Pressable } from "react-native";
 export default function CreateProjectsScreen() {
   const router = useRouter();
   const { colors, statusBarStyle } = useTheme();
@@ -20,7 +20,7 @@ export default function CreateProjectsScreen() {
             accessibilityRole="button"
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={20} color={colors.accent} />
+            <Ionicons name="arrow-back" size={20} color={colors.accent} />
           </TouchableOpacity>
           <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
             Submit Project
@@ -152,18 +152,13 @@ export default function CreateProjectsScreen() {
           </View>
         </ScrollView>
 
-        <View className="absolute bottom-0 left-0 right-0 bg-white px-5 pb-8 pt-4 shadow-lg dark:bg-slate-950">
-          <TouchableOpacity
-            className="h-12 w-full items-center justify-center rounded-2xl bg-emerald-600"
-            accessibilityRole="button"
-          >
-            <View className="flex-row items-center gap-2">
-              <AppText className="text-base font-semibold text-white">
-                Post Project
-              </AppText>
-              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-            </View>
-          </TouchableOpacity>
+        <View className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
+          <Pressable className="flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3">
+            <AppText className="text-sm font-semibold text-white">
+              Publish Project
+            </AppText>
+            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+          </Pressable>
         </View>
       </View>
     </SafeAreaView>
