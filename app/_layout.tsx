@@ -42,6 +42,7 @@ export default function RootLayout() {
           name="spots/create-spots"
           options={{ headerShown: false }}
         />
+        <Stack.Screen name="projects/[id]" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style={statusBarStyle} />
     </View>
