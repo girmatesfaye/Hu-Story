@@ -43,6 +43,15 @@ export default function RootLayout() {
           options={{ headerShown: false }}
         />
         <Stack.Screen name="projects/[id]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="projects/create-projects"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="notifications/notification"
+          options={{ headerShown: false }}
+        />
       </Stack>
       <StatusBar style={statusBarStyle} />
     </View>

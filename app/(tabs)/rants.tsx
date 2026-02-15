@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ScrollView,
   View,
@@ -7,6 +7,7 @@ import {
   useColorScheme,
 } from "react-native";
 import { AppText } from "../../components/AppText";
+import { ReportModal } from "../../components/ReportModal";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 
@@ -57,6 +58,7 @@ const rants = [
 
 export default function RantsScreen() {
   const router = useRouter();
+  const [isReportOpen, setIsReportOpen] = useState(false);
   const scheme = useColorScheme();
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
@@ -79,7 +81,10 @@ export default function RantsScreen() {
             </AppText>
           </View>
 
-          <Pressable className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center">
+          <Pressable
+            onPress={() => router.push("../notifications/notification")}
+            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+          >
             <Ionicons
               name="notifications-outline"
               size={22}
@@ -151,7 +156,10 @@ export default function RantsScreen() {
                   </View>
                 </View>
 
-                <Pressable className="p-1">
+                <Pressable
+                  className="p-1"
+                  onPress={() => setIsReportOpen(true)}
+                >
                   <Ionicons
                     name="ellipsis-horizontal"
                     size={20}
@@ -212,6 +220,10 @@ export default function RantsScreen() {
       >
         <Ionicons name="add" size={26} color={iconColors.chipText} />
       </Pressable>
+      <ReportModal
+        visible={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+      />
     </View>
   );
 }
