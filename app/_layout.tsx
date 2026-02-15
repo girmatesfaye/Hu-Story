@@ -25,7 +25,8 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
-      <Stack>
+      <Stack initialRouteName="splash">
+        <Stack.Screen name="splash" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="rants/[id]" options={{ headerShown: false }} />
         <Stack.Screen
