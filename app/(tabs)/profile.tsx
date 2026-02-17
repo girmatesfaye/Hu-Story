@@ -4,7 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { router } from "expo-router";
-
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 export default function ProfileTabScreen() {
   const { colors, statusBarStyle } = useTheme();
 
@@ -133,11 +134,18 @@ export default function ProfileTabScreen() {
                 <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                   Quiet Study Garden
                 </AppText>
-                <Ionicons
-                  name="ellipsis-horizontal"
-                  size={16}
-                  color={colors.mutedText}
-                />
+                <View className="flex-row items-center gap-4">
+                  <MaterialIcons
+                    name="delete-forever"
+                    size={24}
+                    color={colors.mutedText}
+                  />
+                  <MaterialIcons
+                    name="edit"
+                    size={24}
+                    color={colors.mutedText}
+                  />
+                </View>
               </View>
               <View className="mt-2 flex-row items-center">
                 <Ionicons name="location" size={14} color={colors.accent} />
@@ -190,11 +198,18 @@ export default function ProfileTabScreen() {
                 <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                   Best Coffee @ Gate 1
                 </AppText>
-                <Ionicons
-                  name="ellipsis-horizontal"
-                  size={16}
-                  color={colors.mutedText}
-                />
+                <View className="flex-row items-center gap-4">
+                  <MaterialIcons
+                    name="delete-forever"
+                    size={24}
+                    color={colors.mutedText}
+                  />
+                  <MaterialIcons
+                    name="edit"
+                    size={24}
+                    color={colors.mutedText}
+                  />
+                </View>
               </View>
               <View className="mt-2 flex-row items-center">
                 <Ionicons name="location" size={14} color={colors.accent} />
@@ -240,11 +255,18 @@ export default function ProfileTabScreen() {
                 <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                   Library 3rd Floor Corner
                 </AppText>
-                <Ionicons
-                  name="ellipsis-horizontal"
-                  size={16}
-                  color={colors.mutedText}
-                />
+                <View className="flex-row items-center gap-4">
+                  <MaterialIcons
+                    name="delete-forever"
+                    size={24}
+                    color={colors.mutedText}
+                  />
+                  <MaterialIcons
+                    name="edit"
+                    size={24}
+                    color={colors.mutedText}
+                  />
+                </View>
               </View>
               <View className="mt-2 flex-row items-center">
                 <Ionicons name="location" size={14} color={colors.accent} />
