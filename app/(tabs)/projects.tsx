@@ -94,15 +94,27 @@ export default function ProjectsTabScreen() {
                   Dawit A.
                 </AppText>
               </View>
-              <View className="flex-row items-center">
-                <Ionicons
-                  name="heart-outline"
-                  size={18}
-                  color={statusBarStyle === "light" ? "#94A3B8" : "#64748B"}
-                />
-                <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
-                  24
-                </AppText>
+              <View className="flex-row items-center gap-4">
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name="eye-outline"
+                    size={18}
+                    color={statusBarStyle === "light" ? "#94A3B8" : "#64748B"}
+                  />
+                  <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
+                    24
+                  </AppText>
+                </View>
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name="heart-outline"
+                    size={18}
+                    color={statusBarStyle === "light" ? "#94A3B8" : "#64748B"}
+                  />
+                  <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
+                    24
+                  </AppText>
+                </View>
               </View>
             </View>
           </View>
@@ -114,91 +126,158 @@ export default function ProjectsTabScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          className="mt-6 rounded-3xl bg-white p-5 shadow-sm dark:bg-slate-900"
+          className="mt-6 rounded-3xl bg-white shadow-sm dark:bg-slate-900"
           accessibilityRole="button"
           onPress={() => router.push("../projects/2")}
         >
-          <View className="flex-row items-center justify-between">
-            <AppText className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              Bio-Waste Energy
-            </AppText>
-            <AppText className="text-sm text-slate-400 dark:text-slate-500">
-              5h ago
-            </AppText>
-          </View>
-          <AppText className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
-            Research paper and prototype on converting cafeteria waste to
-            sustainable...
-          </AppText>
-          <View className="mt-4 flex-row flex-wrap gap-2">
-            <View className="rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
-              <AppText className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
-                Sustainability
+          <View className="h-44 rounded-t-3xl bg-emerald-50 dark:bg-emerald-900/30" />
+          <View className="px-5 pb-5 pt-4">
+            <View className="flex-row items-center justify-between">
+              <AppText className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                Campus Bus Tracker
+              </AppText>
+              <AppText className="text-sm text-slate-400 dark:text-slate-500">
+                2h ago
               </AppText>
             </View>
-            <View className="rounded-lg bg-slate-100 px-3 py-1 dark:bg-slate-800">
-              <AppText className="text-xs font-medium text-slate-500 dark:text-slate-300">
-                Research
-              </AppText>
+            <AppText className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+              An app to track the real-time location of university shuttles
+              using GPS modules...
+            </AppText>
+            <View className="mt-4 flex-row flex-wrap gap-2">
+              <View className="rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
+                <AppText className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                  Flutter
+                </AppText>
+              </View>
+              <View className="rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
+                <AppText className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                  Maps API
+                </AppText>
+              </View>
+              <View className="rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
+                <AppText className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                  IoT
+                </AppText>
+              </View>
+            </View>
+            <View className="mt-4 flex-row items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+              <View className="flex-row items-center">
+                <View className="h-9 w-9 items-center justify-center rounded-full bg-emerald-200 dark:bg-emerald-700">
+                  <AppText className="text-xs font-semibold text-emerald-900 dark:text-emerald-50">
+                    DA
+                  </AppText>
+                </View>
+                <AppText className="ml-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Dawit A.
+                </AppText>
+              </View>
+              <View className="flex-row items-center gap-4">
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name="eye-outline"
+                    size={18}
+                    color={statusBarStyle === "light" ? "#94A3B8" : "#64748B"}
+                  />
+                  <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
+                    24
+                  </AppText>
+                </View>
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name="heart-outline"
+                    size={18}
+                    color={statusBarStyle === "light" ? "#94A3B8" : "#64748B"}
+                  />
+                  <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
+                    24
+                  </AppText>
+                </View>
+              </View>
             </View>
           </View>
-          <View className="mt-4 flex-row items-center justify-between">
-            <View className="flex-row -space-x-3">
-              <View className="h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-700">
-                <AppText className="text-xs font-semibold text-slate-600 dark:text-slate-200">
-                  MK
-                </AppText>
-              </View>
-              <View className="h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-emerald-200 dark:border-slate-900 dark:bg-emerald-700">
-                <AppText className="text-xs font-semibold text-emerald-900 dark:text-emerald-50">
-                  LA
-                </AppText>
-              </View>
-              <View className="h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-slate-100 dark:border-slate-900 dark:bg-slate-800">
-                <AppText className="text-xs font-semibold text-slate-500 dark:text-slate-200">
-                  +2
-                </AppText>
-              </View>
-            </View>
-            <AppText className="text-sm text-slate-400 dark:text-slate-500">
-              +2 others
+          <View className="absolute right-5 top-4 rounded-full bg-white px-3 py-1 shadow-sm dark:bg-slate-900">
+            <AppText className="text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+              Featured
             </AppText>
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity
-          className="mt-6 rounded-3xl bg-white p-5 shadow-sm dark:bg-slate-900"
+          className="mt-6 rounded-3xl bg-white shadow-sm dark:bg-slate-900"
           accessibilityRole="button"
           onPress={() => router.push("../projects/3")}
         >
-          <View className="flex-row items-center justify-between">
-            <AppText className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              Freelance Connect
+          <View className="h-44 rounded-t-3xl bg-emerald-50 dark:bg-emerald-900/30" />
+          <View className="px-5 pb-5 pt-4">
+            <View className="flex-row items-center justify-between">
+              <AppText className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                Campus Bus Tracker
+              </AppText>
+              <AppText className="text-sm text-slate-400 dark:text-slate-500">
+                2h ago
+              </AppText>
+            </View>
+            <AppText className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+              An app to track the real-time location of university shuttles
+              using GPS modules...
             </AppText>
-            <AppText className="text-sm text-slate-400 dark:text-slate-500">
-              1d ago
-            </AppText>
+            <View className="mt-4 flex-row flex-wrap gap-2">
+              <View className="rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
+                <AppText className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                  Flutter
+                </AppText>
+              </View>
+              <View className="rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
+                <AppText className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                  Maps API
+                </AppText>
+              </View>
+              <View className="rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
+                <AppText className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
+                  IoT
+                </AppText>
+              </View>
+            </View>
+            <View className="mt-4 flex-row items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+              <View className="flex-row items-center">
+                <View className="h-9 w-9 items-center justify-center rounded-full bg-emerald-200 dark:bg-emerald-700">
+                  <AppText className="text-xs font-semibold text-emerald-900 dark:text-emerald-50">
+                    DA
+                  </AppText>
+                </View>
+                <AppText className="ml-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Dawit A.
+                </AppText>
+              </View>
+              <View className="flex-row items-center gap-4">
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name="eye-outline"
+                    size={18}
+                    color={statusBarStyle === "light" ? "#94A3B8" : "#64748B"}
+                  />
+                  <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
+                    24
+                  </AppText>
+                </View>
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name="heart-outline"
+                    size={18}
+                    color={statusBarStyle === "light" ? "#94A3B8" : "#64748B"}
+                  />
+                  <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
+                    24
+                  </AppText>
+                </View>
+              </View>
+            </View>
           </View>
-          <AppText className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
-            Platform connecting student designers with local businesses in
-            Hawassa for freelance...
-          </AppText>
-          <View className="mt-4 flex-row flex-wrap gap-2">
-            <View className="rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
-              <AppText className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
-                Marketplace
-              </AppText>
-            </View>
-            <View className="rounded-lg bg-slate-100 px-3 py-1 dark:bg-slate-800">
-              <AppText className="text-xs font-medium text-slate-500 dark:text-slate-300">
-                Product
-              </AppText>
-            </View>
-            <View className="rounded-lg bg-slate-100 px-3 py-1 dark:bg-slate-800">
-              <AppText className="text-xs font-medium text-slate-500 dark:text-slate-300">
-                Design
-              </AppText>
-            </View>
+          <View className="absolute right-5 top-4 rounded-full bg-white px-3 py-1 shadow-sm dark:bg-slate-900">
+            <AppText className="text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+              Featured
+            </AppText>
           </View>
         </TouchableOpacity>
       </ScrollView>

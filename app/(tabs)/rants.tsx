@@ -23,6 +23,7 @@ const rants = [
       "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
     votes: 45,
     comments: 12,
+    views: 230,
   },
   {
     id: "2",
@@ -33,6 +34,7 @@ const rants = [
       "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
     votes: 45,
     comments: 12,
+    views: 198,
   },
   {
     id: "3",
@@ -43,6 +45,7 @@ const rants = [
       "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
     votes: 45,
     comments: 12,
+    views: 312,
   },
   {
     id: "4",
@@ -53,6 +56,7 @@ const rants = [
       "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
     votes: 45,
     comments: 12,
+    views: 154,
   },
 ];
 
@@ -191,19 +195,32 @@ export default function RantsScreen() {
                   />
                 </View>
 
-                <Pressable
-                  onPress={() => router.push(`/rants/${rant.id}`)}
-                  className="flex-row items-center gap-1.5 px-2 py-1.5 rounded-lg"
-                >
-                  <Ionicons
-                    name="chatbox-outline"
-                    size={16}
-                    color={iconColors.muted}
-                  />
-                  <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                    {rant.comments} Comments
-                  </AppText>
-                </Pressable>
+                <View className="flex-row items-center gap-3">
+                  <View className="flex-row items-center gap-1">
+                    <Ionicons
+                      name="eye-outline"
+                      size={15}
+                      color={iconColors.muted}
+                    />
+                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                      {rant.views}
+                    </AppText>
+                  </View>
+
+                  <Pressable
+                    onPress={() => router.push(`/rants/${rant.id}`)}
+                    className="flex-row items-center gap-1.5 px-2 py-1.5 rounded-lg"
+                  >
+                    <Ionicons
+                      name="chatbox-outline"
+                      size={16}
+                      color={iconColors.muted}
+                    />
+                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                      {rant.comments} Comments
+                    </AppText>
+                  </Pressable>
+                </View>
               </View>
             </View>
           ))}
