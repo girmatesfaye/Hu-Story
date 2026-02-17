@@ -176,7 +176,7 @@ export default function ProjectDetailsScreen() {
               ))}
             </View>
 
-            <View className="mt-6 flex-row items-center justify-between rounded-2xl border border-slate-100 px-4 py-3 dark:border-slate-800">
+            {/* <View className="mt-6 flex-row items-center justify-between rounded-2xl border border-slate-100 px-4 py-3 dark:border-slate-800">
               <View className="flex-row items-center">
                 <Ionicons
                   name="eye-outline"
@@ -209,7 +209,7 @@ export default function ProjectDetailsScreen() {
                   </View>
                 ))}
               </View>
-            </View>
+            </View> */}
           </View>
         </ScrollView>
 

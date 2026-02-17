@@ -7,6 +7,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useEffect } from "react";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
+import { SupabaseProvider } from "../providers/SupabaseProvider";
 export const unstable_settings = {
   anchor: "(tabs)",
 };
@@ -24,46 +25,51 @@ export default function RootLayout() {
   }, [fontsLoaded]);
   if (!fontsLoaded) return null;
   return (
-    <View className="flex-1 bg-white dark:bg-slate-950">
-      <Stack initialRouteName="splash">
-        <Stack.Screen name="splash" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="rants/[id]" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="rants/create-rants"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen name="events/[id]" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="events/create-events"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen name="spots/[id]" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="spots/create-spots"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen name="projects/[id]" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="projects/create-projects"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="notifications/notification"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="spots/add-review"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="profiles/edit-profile"
-          options={{ headerShown: false }}
-        />
-      </Stack>
-      <StatusBar style={statusBarStyle} />
-    </View>
+    <SupabaseProvider>
+      <View className="flex-1 bg-white dark:bg-slate-950">
+        <Stack initialRouteName="splash">
+          <Stack.Screen name="splash" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="rants/[id]" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="rants/create-rants"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="events/[id]" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="events/create-events"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="spots/[id]" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="spots/create-spots"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="projects/[id]" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="projects/create-projects"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="notifications/notification"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="spots/add-review"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="(auth)/register"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="profiles/edit-profile"
+            options={{ headerShown: false }}
+          />
+        </Stack>
+        <StatusBar style={statusBarStyle} />
+      </View>
+    </SupabaseProvider>
   );
 }
