@@ -11,6 +11,7 @@ import { ReportModal } from "../../components/ReportModal";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { supabase } from "../../lib/supabase";
+import { useSupabase } from "../../providers/SupabaseProvider";
 
 const chips = ["All Rants", "Academics", "Dorms", "Cafeteria", "Spots"];
 
@@ -42,7 +43,9 @@ const formatTimeAgo = (dateString: string) => {
 
 export default function RantsScreen() {
   const router = useRouter();
+  const { session } = useSupabase();
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [activeChip, setActiveChip] = useState(chips[0]);
   const [rants, setRants] = useState<RantItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -93,6 +96,36 @@ export default function RantsScreen() {
       isMounted = false;
     };
   }, [activeChip]);
+
+  const handleReportSubmit = async (reason: string, details: string) => {
+    if (!session?.user?.id) {
+      setErrorMessage("Please log in to report content.");
+      return;
+    }
+
+    if (!selectedReportId) {
+      setErrorMessage("Missing report target.");
+      return;
+    }
+
+    setErrorMessage(null);
+
+    const { error } = await supabase.from("reports").insert({
+      reporter_id: session.user.id,
+      target_type: "rants",
+      target_id: selectedReportId,
+      reason,
+      details: details || null,
+      status: "pending",
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setSelectedReportId(null);
+  };
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
@@ -194,7 +227,10 @@ export default function RantsScreen() {
 
                 <Pressable
                   className="p-1"
-                  onPress={() => setIsReportOpen(true)}
+                  onPress={() => {
+                    setSelectedReportId(rant.id);
+                    setIsReportOpen(true);
+                  }}
                 >
                   <Ionicons
                     name="ellipsis-horizontal"
@@ -272,6 +308,7 @@ export default function RantsScreen() {
       <ReportModal
         visible={isReportOpen}
         onClose={() => setIsReportOpen(false)}
+        onSubmit={handleReportSubmit}
       />
     </View>
   );

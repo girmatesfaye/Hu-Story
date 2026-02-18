@@ -84,6 +84,8 @@ create table if not exists public.events (
   cover_url text,
   tags text[],
   fee_type text,
+  fee_amount numeric,
+  attendees_count int not null default 0,
   host_name text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -95,6 +97,83 @@ create index if not exists events_created_at_idx on public.events(created_at des
 create trigger events_set_updated_at
 before update on public.events
 for each row execute procedure public.set_updated_at();
+
+-- Event attendees
+create table if not exists public.event_attendees (
+  event_id uuid not null references public.events(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (event_id, user_id)
+);
+
+create or replace function public.add_event_attendee(p_event_id uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count int;
+begin
+  insert into public.event_attendees (event_id, user_id)
+  values (p_event_id, auth.uid())
+  on conflict do nothing;
+
+  if found then
+    update public.events
+    set attendees_count = attendees_count + 1
+    where id = p_event_id
+    returning attendees_count into v_count;
+  else
+    select attendees_count into v_count
+    from public.events
+    where id = p_event_id;
+  end if;
+
+  return coalesce(v_count, 0);
+end;
+$$;
+
+create or replace function public.remove_event_attendee(p_event_id uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count int;
+begin
+  delete from public.event_attendees
+  where event_id = p_event_id
+    and user_id = auth.uid();
+
+  if found then
+    update public.events
+    set attendees_count = greatest(attendees_count - 1, 0)
+    where id = p_event_id
+    returning attendees_count into v_count;
+  else
+    select attendees_count into v_count
+    from public.events
+    where id = p_event_id;
+  end if;
+
+  return coalesce(v_count, 0);
+end;
+$$;
+
+-- Backfill attendees_count from event_attendees
+-- update public.events e
+-- set attendees_count = coalesce(a.cnt, 0)
+-- from (
+--   select event_id, count(*) as cnt
+--   from public.event_attendees
+--   group by event_id
+-- ) a
+-- where e.id = a.event_id;
+-- update public.events
+-- set attendees_count = 0
+-- where id not in (select distinct event_id from public.event_attendees);
 
 -- Spots
 create table if not exists public.spots (
