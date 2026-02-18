@@ -7,7 +7,7 @@ import { AppText } from "../components/AppText";
 import { useTheme } from "../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSupabase } from "../providers/SupabaseProvider";
-import { isAdminEmail } from "../constants/admin";
+import { isAdminUser } from "../constants/admin";
 
 export default function SplashScreen() {
   const { colors, statusBarStyle } = useTheme();
@@ -18,18 +18,17 @@ export default function SplashScreen() {
     if (isLoading) return;
 
     const timeout = setTimeout(() => {
-      const email = session?.user?.email ?? null;
-      if (email && isAdminEmail(email)) {
-        router.replace("/admin");
-        return;
-      }
+      const route = async () => {
+        if (session) {
+          const isAdmin = await isAdminUser();
+          router.replace(isAdmin ? "/admin" : "/(tabs)/rants");
+          return;
+        }
 
-      if (session) {
-        router.replace("/(tabs)/rants");
-        return;
-      }
+        router.replace("../(auth)/register");
+      };
 
-      router.replace("../(auth)/register");
+      void route();
     }, 1200);
 
     return () => clearTimeout(timeout);

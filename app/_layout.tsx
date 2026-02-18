@@ -35,6 +35,10 @@ export default function RootLayout() {
             name="rants/create-rants"
             options={{ headerShown: false }}
           />
+          <Stack.Screen
+            name="rants/edit/[id]"
+            options={{ headerShown: false }}
+          />
           <Stack.Screen name="events/[id]" options={{ headerShown: false }} />
           <Stack.Screen
             name="events/create-events"
@@ -45,16 +49,24 @@ export default function RootLayout() {
             name="spots/create-spots"
             options={{ headerShown: false }}
           />
+          <Stack.Screen
+            name="spots/edit/[id]"
+            options={{ headerShown: false }}
+          />
           <Stack.Screen name="projects/[id]" options={{ headerShown: false }} />
           <Stack.Screen
             name="projects/create-projects"
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="projects/edit/[id]"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="notifications/notification"
             options={{ headerShown: false }}
           />
-          <Stack.Screen name="admin" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/index" options={{ headerShown: false }} />
           <Stack.Screen
             name="spots/add-review"
             options={{ headerShown: false }}

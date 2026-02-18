@@ -12,6 +12,12 @@ begin
 end;
 $$ language plpgsql;
 
+-- Admin emails (manual allowlist)
+create table if not exists public.admin_emails (
+  email text primary key,
+  created_at timestamptz not null default now()
+);
+
 -- Profiles
 create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),

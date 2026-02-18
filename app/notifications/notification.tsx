@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const filters = ["All", "Rants", "Events", "Projects"];
 
@@ -59,17 +60,35 @@ export default function NotificationScreen() {
     return activeFilter.toLowerCase();
   }, [activeFilter]);
 
-  const unreadCount = useMemo(() => {
-    const filtered = activeType
-      ? notifications.filter(
-          (item) => (item.type ?? "").toLowerCase() === activeType,
-        )
-      : notifications;
-    return filtered.filter((item) => !item.is_read).length;
+  const visibleNotifications = useMemo(() => {
+    if (!activeType) return notifications;
+    return notifications.filter(
+      (item) => (item.type ?? "").toLowerCase() === activeType,
+    );
   }, [notifications, activeType]);
+
+  const unreadCount = useMemo(
+    () => visibleNotifications.filter((item) => !item.is_read).length,
+    [visibleNotifications],
+  );
 
   useEffect(() => {
     let isMounted = true;
+    const cacheKey = session?.user?.id
+      ? `notifications:${session.user.id}`
+      : null;
+
+    const loadCached = async () => {
+      if (!cacheKey) return;
+      try {
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (!cached || !isMounted) return;
+        const parsed = JSON.parse(cached) as NotificationItem[];
+        setNotifications(parsed);
+      } catch {
+        // ignore cache errors
+      }
+    };
 
     const loadNotifications = async () => {
       if (!session?.user?.id) {
@@ -86,10 +105,6 @@ export default function NotificationScreen() {
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
 
-      if (activeType) {
-        query = query.eq("type", activeType);
-      }
-
       const { data, error } = await query;
 
       if (!isMounted) return;
@@ -102,14 +117,75 @@ export default function NotificationScreen() {
       }
 
       setIsLoading(false);
+
+      if (!error && cacheKey) {
+        try {
+          await AsyncStorage.setItem(
+            cacheKey,
+            JSON.stringify((data ?? []) as NotificationItem[]),
+          );
+        } catch {
+          // ignore cache errors
+        }
+      }
     };
 
+    loadCached();
     loadNotifications();
 
     return () => {
       isMounted = false;
     };
-  }, [session?.user?.id, activeType]);
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const userId = session.user.id;
+    const channel = supabase
+      .channel(`notifications-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const eventType = payload.eventType;
+
+          if (eventType === "INSERT") {
+            const newRow = payload.new as NotificationItem;
+            setNotifications((prev) => {
+              if (prev.some((item) => item.id === newRow.id)) return prev;
+              return [newRow, ...prev];
+            });
+          }
+
+          if (eventType === "UPDATE") {
+            const updatedRow = payload.new as NotificationItem;
+            setNotifications((prev) =>
+              prev.map((item) =>
+                item.id === updatedRow.id ? updatedRow : item,
+              ),
+            );
+          }
+
+          if (eventType === "DELETE") {
+            const oldRow = payload.old as NotificationItem;
+            setNotifications((prev) =>
+              prev.filter((item) => item.id !== oldRow.id),
+            );
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
 
   const handleMarkAllRead = async () => {
     if (!session?.user?.id) return;
@@ -219,7 +295,7 @@ export default function NotificationScreen() {
             ) : null}
 
             <View className="mt-4 gap-4">
-              {notifications.map((item) => {
+              {visibleNotifications.map((item) => {
                 const tone = getNotificationTone(item.type);
 
                 return (
@@ -262,7 +338,7 @@ export default function NotificationScreen() {
             </View>
           </View>
 
-          {!isLoading && notifications.length === 0 ? (
+          {!isLoading && visibleNotifications.length === 0 ? (
             <View className="mt-8 items-center pb-6">
               <View className="h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 <Ionicons
