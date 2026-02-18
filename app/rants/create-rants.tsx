@@ -4,19 +4,49 @@ import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "../../components/AppText";
 import Feather from "@expo/vector-icons/Feather";
-
-import {
-  SafeAreaView,
-  SafeAreaProvider,
-  SafeAreaInsetsContext,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../lib/supabase";
+import { useSupabase } from "../../providers/SupabaseProvider";
 const categories = ["Campus Life", "Cafeteria", "Academics", "Dorms", "Spots"];
 
 export default function CreateRantScreen() {
   const router = useRouter();
+  const { session } = useSupabase();
   const [activeCategory, setActiveCategory] = useState(categories[0]);
   const [text, setText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!session?.user) {
+      setErrorMessage("Please log in to post a rant.");
+      return;
+    }
+
+    if (!text.trim()) {
+      setErrorMessage("Write something before posting.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    const { error } = await supabase.from("rants").insert({
+      user_id: session.user.id,
+      category: activeCategory,
+      content: text.trim(),
+      is_anonymous: true,
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    router.replace("/(tabs)/rants");
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
@@ -89,13 +119,25 @@ export default function CreateRantScreen() {
             Your rant is 100% anonymous & untraceable.
           </AppText>
         </View>
+
+        {errorMessage ? (
+          <AppText className="mt-4 text-sm text-red-500">
+            {errorMessage}
+          </AppText>
+        ) : null}
       </ScrollView>
 
       <View className="px-5 pb-6">
-        <Pressable className="bg-green-600 dark:bg-green-400 rounded-2xl py-4 items-center justify-center shadow-lg">
+        <Pressable
+          className={`bg-green-600 dark:bg-green-400 rounded-2xl py-4 items-center justify-center shadow-lg ${
+            isSubmitting ? "opacity-60" : ""
+          }`}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
           <View className="flex-row items-center gap-2">
             <AppText className="text-base font-semibold text-white dark:text-slate-950">
-              Post Rant
+              {isSubmitting ? "Posting..." : "Post Rant"}
             </AppText>
             <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
           </View>

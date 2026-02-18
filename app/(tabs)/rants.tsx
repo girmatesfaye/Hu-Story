@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   View,
@@ -10,59 +10,43 @@ import { AppText } from "../../components/AppText";
 import { ReportModal } from "../../components/ReportModal";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import { supabase } from "../../lib/supabase";
 
 const chips = ["All Rants", "Academics", "Dorms", "Cafeteria", "Spots"];
 
-const rants = [
-  {
-    id: "1",
-    name: "Anonymous Student",
-    time: "2h ago",
-    tag: "Academics",
-    content:
-      "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
-    votes: 45,
-    comments: 12,
-    views: 230,
-  },
-  {
-    id: "2",
-    name: "Anonymous ",
-    time: "2h ago",
-    tag: "Academics",
-    content:
-      "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
-    votes: 45,
-    comments: 12,
-    views: 198,
-  },
-  {
-    id: "3",
-    name: "Anonymous Student",
-    time: "2h ago",
-    tag: "Academics",
-    content:
-      "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
-    votes: 45,
-    comments: 12,
-    views: 312,
-  },
-  {
-    id: "4",
-    name: "Anonymous ",
-    time: "2h ago",
-    tag: "Academics",
-    content:
-      "Why is the wifi always down in the library during finals week? It is the only time everyone needs it.",
-    votes: 45,
-    comments: 12,
-    views: 154,
-  },
-];
+type RantItem = {
+  id: string;
+  category: string | null;
+  content: string;
+  upvotes: number;
+  downvotes: number;
+  comment_count: number;
+  views: number;
+  created_at: string;
+  is_anonymous: boolean;
+};
+
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 export default function RantsScreen() {
   const router = useRouter();
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [activeChip, setActiveChip] = useState(chips[0]);
+  const [rants, setRants] = useState<RantItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const scheme = useColorScheme();
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
@@ -70,6 +54,45 @@ export default function RantsScreen() {
     accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadRants = async () => {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      let query = supabase
+        .from("rants")
+        .select(
+          "id, category, content, upvotes, downvotes, comment_count, views, created_at, is_anonymous",
+        )
+        .order("created_at", { ascending: false });
+
+      if (activeChip !== "All Rants") {
+        query = query.eq("category", activeChip);
+      }
+
+      const { data, error } = await query;
+
+      if (!isMounted) return;
+
+      if (error) {
+        setErrorMessage(error.message);
+        setRants([]);
+      } else {
+        setRants((data ?? []) as RantItem[]);
+      }
+
+      setIsLoading(false);
+    };
+
+    loadRants();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeChip]);
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
@@ -103,8 +126,8 @@ export default function RantsScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="gap-2 pb-1"
         >
-          {chips.map((chip, index) => {
-            const active = index === 0;
+          {chips.map((chip) => {
+            const active = chip === activeChip;
             return (
               <View
                 key={chip}
@@ -113,6 +136,7 @@ export default function RantsScreen() {
                     ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
                     : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
                 }`}
+                onTouchEnd={() => setActiveChip(chip)}
               >
                 <AppText
                   className={`text-xs ${
@@ -130,6 +154,14 @@ export default function RantsScreen() {
 
         {/* Cards */}
         <View className="mt-3 gap-4">
+          {isLoading ? (
+            <AppText className="text-sm text-slate-400 dark:text-slate-500">
+              Loading rants...
+            </AppText>
+          ) : null}
+          {errorMessage ? (
+            <AppText className="text-sm text-red-500">{errorMessage}</AppText>
+          ) : null}
           {rants.map((rant) => (
             <View
               key={rant.id}
@@ -146,16 +178,16 @@ export default function RantsScreen() {
 
                 <View className="flex-1 ml-2.5">
                   <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {rant.name}
+                    {rant.is_anonymous ? "Anonymous Student" : "Student"}
                   </AppText>
 
                   <View className="flex-row items-center mt-0.5">
                     <AppText className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {rant.time}
+                      {formatTimeAgo(rant.created_at)}
                     </AppText>
                     <View className="w-1 h-1 rounded-full mx-1.5 bg-slate-200 dark:bg-slate-800" />
                     <AppText className="text-[11px] text-green-600 dark:text-green-400">
-                      {rant.tag}
+                      {rant.category ?? "General"}
                     </AppText>
                   </View>
                 </View>
@@ -186,7 +218,7 @@ export default function RantsScreen() {
                     color={iconColors.accent}
                   />
                   <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
-                    {rant.votes}
+                    {rant.upvotes - rant.downvotes}
                   </AppText>
                   <Ionicons
                     name="arrow-down"
@@ -217,7 +249,7 @@ export default function RantsScreen() {
                       color={iconColors.muted}
                     />
                     <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                      {rant.comments} Comments
+                      {rant.comment_count} Comments
                     </AppText>
                   </Pressable>
                 </View>

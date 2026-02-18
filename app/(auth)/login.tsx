@@ -6,11 +6,40 @@ import { useState } from "react";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../lib/supabase";
 
 export default function LoginScreen() {
   const { colors, statusBarStyle } = useTheme();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password) {
+      setErrorMessage("Enter your email and password.");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    setIsLoading(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    router.replace("/(tabs)/rants");
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -48,6 +77,9 @@ export default function LoginScreen() {
                     placeholderTextColor={colors.mutedStrong}
                     className="flex-1 text-sm text-slate-900 dark:text-slate-100"
                     keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={email}
+                    onChangeText={setEmail}
                   />
                 </View>
               </View>
@@ -67,6 +99,8 @@ export default function LoginScreen() {
                     placeholderTextColor={colors.mutedStrong}
                     className="flex-1 text-sm text-slate-900 dark:text-slate-100"
                     secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
                   />
                   <TouchableOpacity
                     accessibilityRole="button"
@@ -89,13 +123,22 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
 
+              {errorMessage ? (
+                <AppText className="mt-3 text-sm text-red-500">
+                  {errorMessage}
+                </AppText>
+              ) : null}
+
               <TouchableOpacity
-                onPress={() => router.push("/(tabs)/rants")}
-                className="mt-8 h-12 items-center justify-center rounded-2xl bg-emerald-600"
+                onPress={handleLogin}
+                className={`mt-8 h-12 items-center justify-center rounded-2xl bg-emerald-600 ${
+                  isLoading ? "opacity-60" : ""
+                }`}
                 accessibilityRole="button"
+                disabled={isLoading}
               >
                 <AppText className="text-base font-semibold text-white">
-                  Log In
+                  {isLoading ? "Logging in..." : "Log In"}
                 </AppText>
               </TouchableOpacity>
 

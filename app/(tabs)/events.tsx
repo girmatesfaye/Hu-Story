@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { useColorScheme } from "react-native";
+import { supabase } from "../../lib/supabase";
 
 const dateChips = [
   { id: "d1", day: "OCT", date: "12", active: true },
@@ -16,54 +17,44 @@ const dateChips = [
   { id: "d6", day: "OCT", date: "17" },
 ];
 
-const todayEvents = [
-  {
-    id: "t1",
-    title: "Freshman Welcome Party",
-    time: "6:00 PM - 10:00 PM",
-    location: "Main Campus Hall",
-    price: "Free",
-    image:
-      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=600&q=80",
-    attendees: ["JD", "MK"],
-    extra: "+12",
-    badge: "Today",
-  },
-  {
-    id: "t2",
-    title: "Intro to Python Workshop",
-    time: "2:00 PM - 4:00 PM",
-    location: "Tech Block B, Lab 3",
-    price: "50 ETB",
-    image:
-      "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=600&q=80",
-    host: "By CS Club",
-  },
-];
+type EventItem = {
+  id: string;
+  title: string;
+  start_at: string | null;
+  end_at: string | null;
+  location: string | null;
+  cover_url: string | null;
+  fee_type: string | null;
+  host_name: string | null;
+};
 
-const nextWeekEvents = [
-  {
-    id: "n1",
-    title: "Hawassa Charity Run",
-    time: "7:00 AM Start",
-    location: "Stadium Entrance",
-    price: "Free",
-    image:
-      "https://images.unsplash.com/photo-1483721310020-03333e577078?auto=format&fit=crop&w=600&q=80",
-    dateTag: "OCT 20",
-    action: "Details",
-  },
-  {
-    id: "n2",
-    title: "Architecture Showcase",
-    time: "Oct 22 • 4:00 PM",
-    location: "Design Studio A",
-    price: "Closed",
-    image:
-      "https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?auto=format&fit=crop&w=600&q=80",
-    soldOut: true,
-  },
-];
+const fallbackEventImage =
+  "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=600&q=80";
+
+const formatEventTime = (startAt: string | null, endAt: string | null) => {
+  if (!startAt) return "Time TBD";
+  const startDate = new Date(startAt);
+  if (Number.isNaN(startDate.getTime())) return "Time TBD";
+  const startLabel = startDate.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  if (!endAt) return startLabel;
+  const endDate = new Date(endAt);
+  if (Number.isNaN(endDate.getTime())) return startLabel;
+  const endLabel = endDate.toLocaleString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${startLabel} - ${endLabel}`;
+};
+
+const isSameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
 
 type EventCardProps = {
   title: string;
@@ -200,6 +191,9 @@ export default function EventTabScreen() {
   const { colors } = useTheme();
   const iconColor = colors.mutedStrong;
   const scheme = useColorScheme();
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
@@ -207,6 +201,64 @@ export default function EventTabScreen() {
     accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadEvents = async () => {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      const { data, error } = await supabase
+        .from("events")
+        .select(
+          "id, title, start_at, end_at, location, cover_url, fee_type, host_name",
+        )
+        .order("start_at", { ascending: true });
+
+      if (!isMounted) return;
+
+      if (error) {
+        setErrorMessage(error.message);
+        setEvents([]);
+      } else {
+        setEvents((data ?? []) as EventItem[]);
+      }
+
+      setIsLoading(false);
+    };
+
+    loadEvents();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const { todayEvents, nextWeekEvents } = useMemo(() => {
+    const today = new Date();
+    const todayList: EventItem[] = [];
+    const nextList: EventItem[] = [];
+
+    events.forEach((event) => {
+      if (!event.start_at) {
+        nextList.push(event);
+        return;
+      }
+      const eventDate = new Date(event.start_at);
+      if (Number.isNaN(eventDate.getTime())) {
+        nextList.push(event);
+        return;
+      }
+      if (isSameDay(eventDate, today)) {
+        todayList.push(event);
+      } else {
+        nextList.push(event);
+      }
+    });
+
+    return { todayEvents: todayList, nextWeekEvents: nextList };
+  }, [events]);
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -291,15 +343,29 @@ export default function EventTabScreen() {
             Today
           </AppText>
           <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-            3 Events
+            {todayEvents.length} Events
           </AppText>
         </View>
 
         <View className="mt-3 gap-4">
+          {isLoading ? (
+            <AppText className="text-sm text-slate-400 dark:text-slate-500">
+              Loading events...
+            </AppText>
+          ) : null}
+          {errorMessage ? (
+            <AppText className="text-sm text-red-500">{errorMessage}</AppText>
+          ) : null}
           {todayEvents.map((event) => (
             <EventCard
               key={event.id}
-              {...event}
+              title={event.title}
+              time={formatEventTime(event.start_at, event.end_at)}
+              location={event.location ?? "Location TBD"}
+              price={event.fee_type?.toLowerCase() === "paid" ? "Paid" : "Free"}
+              image={event.cover_url ?? fallbackEventImage}
+              badge="Today"
+              host={event.host_name ? `By ${event.host_name}` : undefined}
               iconColor={iconColor}
               onPress={() => router.push(`../events/${event.id}`)}
             />
@@ -313,7 +379,12 @@ export default function EventTabScreen() {
           {nextWeekEvents.map((event) => (
             <EventCard
               key={event.id}
-              {...event}
+              title={event.title}
+              time={formatEventTime(event.start_at, event.end_at)}
+              location={event.location ?? "Location TBD"}
+              price={event.fee_type?.toLowerCase() === "paid" ? "Paid" : "Free"}
+              image={event.cover_url ?? fallbackEventImage}
+              host={event.host_name ? `By ${event.host_name}` : undefined}
               iconColor={iconColor}
               onPress={() => router.push(`../events/${event.id}`)}
             />

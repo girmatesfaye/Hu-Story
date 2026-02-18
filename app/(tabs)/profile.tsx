@@ -6,8 +6,84 @@ import { useTheme } from "../../hooks/useTheme";
 import { router } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
+import { useSupabase } from "../../providers/SupabaseProvider";
+
+type Profile = {
+  full_name: string | null;
+  username: string | null;
+  campus: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+};
+
 export default function ProfileTabScreen() {
   const { colors, statusBarStyle } = useTheme();
+  const { session } = useSupabase();
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      if (!session?.user) {
+        if (isMounted) {
+          setProfile(null);
+        }
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("full_name, username, campus, avatar_url, bio")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+
+      if (error) {
+        if (isMounted) {
+          setProfile(null);
+        }
+        return;
+      }
+
+      if (!data) {
+        const fallbackCampus =
+          session.user.user_metadata?.campus ?? "Hawassa University";
+        await supabase
+          .from("profiles")
+          .insert({ user_id: session.user.id, campus: fallbackCampus });
+        const { data: freshProfile } = await supabase
+          .from("profiles")
+          .select("full_name, username, campus, avatar_url, bio")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        if (isMounted) {
+          setProfile(freshProfile ?? null);
+        }
+        return;
+      }
+
+      if (isMounted) {
+        setProfile(data);
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.user]);
+
+  const displayName =
+    profile?.full_name?.trim() ||
+    session?.user?.email?.split("@")[0] ||
+    "Student";
+  const displayCampus = profile?.campus ?? "Hawassa University";
+  const avatarUrl =
+    profile?.avatar_url ??
+    "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80";
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -44,9 +120,7 @@ export default function ProfileTabScreen() {
           <View className="relative">
             <View className="h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-200 shadow-sm dark:border-slate-950 dark:bg-slate-800">
               <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80",
-                }}
+                source={{ uri: avatarUrl }}
                 className="h-full w-full rounded-full"
                 resizeMode="cover"
               />
@@ -61,12 +135,12 @@ export default function ProfileTabScreen() {
           </View>
 
           <AppText className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-            Abebe Kebede
+            {displayName}
           </AppText>
           <View className="mt-2 flex-row items-center">
             <Ionicons name="school" size={14} color={colors.accent} />
             <AppText className="ml-2 text-sm text-slate-500 dark:text-slate-400">
-              Hawassa University
+              {displayCampus}
             </AppText>
           </View>
         </View>
