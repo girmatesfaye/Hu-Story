@@ -11,17 +11,18 @@ alter table public.spot_reviews enable row level security;
 alter table public.projects enable row level security;
 alter table public.notifications enable row level security;
 alter table public.reports enable row level security;
+alter table public.admin_emails enable row level security;
 
--- Admin helper (replace emails with real admin emails)
+-- Admin helper (checks admin_emails table)
 create or replace function public.is_admin()
 returns boolean
 language sql
 stable
 as $$
-  select lower(coalesce(auth.jwt() ->> 'email', '')) = any (
-    array[
-      'admin@example.com'
-    ]
+  select exists (
+    select 1
+    from public.admin_emails
+    where email = lower(coalesce(auth.jwt() ->> 'email', ''))
   );
 $$;
 

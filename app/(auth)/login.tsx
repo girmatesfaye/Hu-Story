@@ -7,7 +7,7 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
-import { isAdminEmail } from "../../constants/admin";
+import { isAdminUser } from "../../constants/admin";
 
 export default function LoginScreen() {
   const { colors, statusBarStyle } = useTheme();
@@ -39,8 +39,8 @@ export default function LoginScreen() {
       return;
     }
 
-    const signedInEmail = data.user?.email ?? data.session?.user?.email;
-    if (isAdminEmail(signedInEmail)) {
+    const isAdmin = await isAdminUser();
+    if (isAdmin) {
       router.replace("/admin");
       return;
     }

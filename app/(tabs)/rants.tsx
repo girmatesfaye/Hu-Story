@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ScrollView,
   View,
@@ -10,6 +10,7 @@ import { AppText } from "../../components/AppText";
 import { ReportModal } from "../../components/ReportModal";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 
@@ -58,44 +59,51 @@ export default function RantsScreen() {
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
 
+  const loadRants = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    let query = supabase
+      .from("rants")
+      .select(
+        "id, category, content, upvotes, downvotes, comment_count, views, created_at, is_anonymous",
+      )
+      .order("created_at", { ascending: false });
+
+    if (activeChip !== "All Rants") {
+      query = query.eq("category", activeChip);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      setErrorMessage(error.message);
+      setRants([]);
+    } else {
+      setRants((data ?? []) as RantItem[]);
+    }
+
+    setIsLoading(false);
+  }, [activeChip]);
+
   useEffect(() => {
     let isMounted = true;
-
-    const loadRants = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      let query = supabase
-        .from("rants")
-        .select(
-          "id, category, content, upvotes, downvotes, comment_count, views, created_at, is_anonymous",
-        )
-        .order("created_at", { ascending: false });
-
-      if (activeChip !== "All Rants") {
-        query = query.eq("category", activeChip);
-      }
-
-      const { data, error } = await query;
-
+    const load = async () => {
       if (!isMounted) return;
-
-      if (error) {
-        setErrorMessage(error.message);
-        setRants([]);
-      } else {
-        setRants((data ?? []) as RantItem[]);
-      }
-
-      setIsLoading(false);
+      await loadRants();
     };
-
-    loadRants();
-
+    load();
     return () => {
       isMounted = false;
     };
-  }, [activeChip]);
+  }, [loadRants]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadRants();
+      return undefined;
+    }, [loadRants]),
+  );
 
   const handleReportSubmit = async (reason: string, details: string) => {
     if (!session?.user?.id) {

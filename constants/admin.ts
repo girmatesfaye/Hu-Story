@@ -1,6 +1,20 @@
-export const adminEmails = ["admin@example.com"];
+import { supabase } from "../lib/supabase";
 
-export const isAdminEmail = (email?: string | null) => {
-  if (!email) return false;
-  return adminEmails.includes(email.trim().toLowerCase());
+const isJwtExpired = (message?: string) =>
+  Boolean(message && message.toLowerCase().includes("jwt expired"));
+
+const requestIsAdmin = async () => {
+  const { data, error } = await supabase.rpc("is_admin");
+  if (error) {
+    if (isJwtExpired(error.message)) {
+      await supabase.auth.refreshSession();
+      const retry = await supabase.rpc("is_admin");
+      if (retry.error) return false;
+      return Boolean(retry.data);
+    }
+    return false;
+  }
+  return Boolean(data);
 };
+
+export const isAdminUser = async () => requestIsAdmin();

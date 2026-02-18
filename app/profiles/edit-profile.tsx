@@ -87,6 +87,7 @@ export default function EditProfileScreen() {
     }
 
     setSuccessMessage("Profile updated.");
+    router.back();
   };
 
   return (

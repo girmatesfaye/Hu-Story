@@ -8,7 +8,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import { useRouter } from "expo-router";
-import { isAdminEmail } from "../../constants/admin";
+import { isAdminUser } from "../../constants/admin";
 
 const moderationTabs = [
   { id: "pending", label: "Pending" },
@@ -187,15 +187,19 @@ export default function AdminScreen() {
   useEffect(() => {
     if (authLoading) return;
 
-    const email = session?.user?.email ?? null;
-    if (!email) {
+    if (!session?.user) {
       router.replace("/(auth)/login");
       return;
     }
 
-    if (!isAdminEmail(email)) {
-      router.replace("/(tabs)/rants");
-    }
+    const ensureAdmin = async () => {
+      const isAdmin = await isAdminUser();
+      if (!isAdmin) {
+        router.replace("/(tabs)/rants");
+      }
+    };
+
+    void ensureAdmin();
   }, [authLoading, session, router]);
 
   const pendingCount = useMemo(

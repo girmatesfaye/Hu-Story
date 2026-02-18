@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type RantDetail = {
   id: string;
@@ -66,6 +67,23 @@ export default function RantCommentsScreen() {
 
   useEffect(() => {
     let isMounted = true;
+    const cacheKey = id ? `rant-comments:${id}` : null;
+
+    const loadCached = async () => {
+      if (!cacheKey) return;
+      try {
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (!cached || !isMounted) return;
+        const parsed = JSON.parse(cached) as {
+          rant?: RantDetail | null;
+          comments?: RantComment[];
+        };
+        if (parsed.rant) setRant(parsed.rant);
+        if (parsed.comments) setComments(parsed.comments);
+      } catch {
+        // ignore cache errors
+      }
+    };
 
     const loadRant = async () => {
       if (!id) return;
@@ -99,12 +117,96 @@ export default function RantCommentsScreen() {
         setComments((commentData ?? []) as RantComment[]);
         setIsLoading(false);
       }
+
+      if (cacheKey && !rantError && !commentError) {
+        try {
+          await AsyncStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              rant: (rantData as RantDetail) ?? null,
+              comments: (commentData ?? []) as RantComment[],
+            }),
+          );
+        } catch {
+          // ignore cache errors
+        }
+      }
     };
 
+    loadCached();
     loadRant();
 
     return () => {
       isMounted = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel(`rant-comments-${id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "rant_comments",
+          filter: `rant_id=eq.${id}`,
+        },
+        (payload) => {
+          const eventType = payload.eventType;
+
+          if (eventType === "INSERT") {
+            const newRow = payload.new as RantComment & {
+              parent_comment_id?: string | null;
+            };
+
+            if (newRow.parent_comment_id) return;
+
+            setComments((prev) => {
+              if (prev.some((comment) => comment.id === newRow.id)) return prev;
+              return [...prev, newRow];
+            });
+            setRant((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    comment_count: (prev.comment_count ?? 0) + 1,
+                  }
+                : prev,
+            );
+          }
+
+          if (eventType === "UPDATE") {
+            const updatedRow = payload.new as RantComment;
+            setComments((prev) =>
+              prev.map((comment) =>
+                comment.id === updatedRow.id ? updatedRow : comment,
+              ),
+            );
+          }
+
+          if (eventType === "DELETE") {
+            const oldRow = payload.old as RantComment;
+            setComments((prev) =>
+              prev.filter((comment) => comment.id !== oldRow.id),
+            );
+            setRant((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    comment_count: Math.max((prev.comment_count ?? 1) - 1, 0),
+                  }
+                : prev,
+            );
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
   }, [id]);
 
@@ -274,4 +376,3 @@ export default function RantCommentsScreen() {
     </SafeAreaView>
   );
 }
-
