@@ -187,40 +187,6 @@ export default function ProjectDetailsScreen() {
                 </View>
               ))}
             </View>
-            <View className="mt-6 flex-row items-center justify-between rounded-2xl border border-slate-100 px-4 py-3 dark:border-slate-800">
-              <View className="flex-row items-center">
-                <Ionicons
-                  name="eye-outline"
-                  size={16}
-                  color={statusBarStyle === "light" ? "#CBD5F5" : "#64748B"}
-                />
-                <AppText className="ml-2 text-xs text-slate-500 dark:text-slate-400">
-                  {project?.views ?? 0}
-                </AppText>
-              </View>
-              <View className="flex-row items-center">
-                <Ionicons
-                  name="heart"
-                  size={16}
-                  color={statusBarStyle === "light" ? "#CBD5F5" : "#64748B"}
-                />
-                <AppText className="ml-2 text-xs text-slate-500 dark:text-slate-400">
-                  {project?.likes ?? 0}
-                </AppText>
-              </View>
-              <View className="flex-row -space-x-3">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <View
-                    key={`member-${index}`}
-                    className="h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-200 dark:border-slate-900 dark:bg-slate-700"
-                  >
-                    <AppText className="text-[10px] font-semibold text-slate-600 dark:text-slate-200">
-                      ST
-                    </AppText>
-                  </View>
-                ))}
-              </View>
-            </View>
           </View>
         </ScrollView>
 
@@ -233,7 +199,7 @@ export default function ProjectDetailsScreen() {
               name="arrow-up-right-box-outline"
               size={20}
               color="#FFFFFF"
-            />{" "}
+            />
           </Pressable>
         </View>
       </View>

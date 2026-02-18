@@ -4,11 +4,133 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../../lib/supabase";
+import { useSupabase } from "../../providers/SupabaseProvider";
 
 const filters = ["All", "Rants", "Events", "Projects"];
 
+type NotificationItem = {
+  id: string;
+  title: string;
+  body: string | null;
+  type: string | null;
+  is_read: boolean;
+  created_at: string;
+};
+
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
+
+const getNotificationTone = (type?: string | null) => {
+  switch ((type ?? "").toLowerCase()) {
+    case "rants":
+      return { icon: "chatbox", bg: "bg-emerald-100", color: "#16A34A" };
+    case "events":
+      return { icon: "calendar", bg: "bg-orange-100", color: "#F97316" };
+    case "projects":
+      return { icon: "rocket", bg: "bg-violet-100", color: "#7C3AED" };
+    default:
+      return { icon: "notifications", bg: "bg-slate-100", color: "#64748B" };
+  }
+};
+
 export default function NotificationScreen() {
   const { colors, statusBarStyle } = useTheme();
+  const { session } = useSupabase();
+  const [activeFilter, setActiveFilter] = useState(filters[0]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const activeType = useMemo(() => {
+    if (activeFilter === "All") return null;
+    return activeFilter.toLowerCase();
+  }, [activeFilter]);
+
+  const unreadCount = useMemo(() => {
+    const filtered = activeType
+      ? notifications.filter(
+          (item) => (item.type ?? "").toLowerCase() === activeType,
+        )
+      : notifications;
+    return filtered.filter((item) => !item.is_read).length;
+  }, [notifications, activeType]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadNotifications = async () => {
+      if (!session?.user?.id) {
+        setNotifications([]);
+        return;
+      }
+
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      let query = supabase
+        .from("notifications")
+        .select("id, title, body, type, is_read, created_at")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (activeType) {
+        query = query.eq("type", activeType);
+      }
+
+      const { data, error } = await query;
+
+      if (!isMounted) return;
+
+      if (error) {
+        setErrorMessage(error.message);
+        setNotifications([]);
+      } else {
+        setNotifications((data ?? []) as NotificationItem[]);
+      }
+
+      setIsLoading(false);
+    };
+
+    loadNotifications();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.user?.id, activeType]);
+
+  const handleMarkAllRead = async () => {
+    if (!session?.user?.id) return;
+
+    setErrorMessage(null);
+
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("user_id", session.user.id)
+      .eq("is_read", false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setNotifications((current) =>
+      current.map((item) => ({ ...item, is_read: true })),
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -29,13 +151,22 @@ export default function NotificationScreen() {
                     color={colors.accent}
                   />
                 </View>
-                <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-emerald-500" />
+                {unreadCount > 0 ? (
+                  <View className="absolute -right-2 -top-2 h-6 min-w-[24px] items-center justify-center rounded-full bg-red-500 px-1">
+                    <AppText className="text-[10px] font-semibold text-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </AppText>
+                  </View>
+                ) : null}
               </View>
               <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
                 Notifications
               </AppText>
             </View>
-            <TouchableOpacity accessibilityRole="button">
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={handleMarkAllRead}
+            >
               <AppText className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                 Mark all read
               </AppText>
@@ -47,8 +178,8 @@ export default function NotificationScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerClassName="mt-5 gap-3"
           >
-            {filters.map((filter, index) => {
-              const isActive = index === 0;
+            {filters.map((filter) => {
+              const isActive = filter === activeFilter;
 
               return (
                 <TouchableOpacity
@@ -59,6 +190,7 @@ export default function NotificationScreen() {
                       : "border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
                   }`}
                   accessibilityRole="button"
+                  onPress={() => setActiveFilter(filter)}
                 >
                   <AppText
                     className={`text-xs font-semibold ${
@@ -75,154 +207,75 @@ export default function NotificationScreen() {
           </ScrollView>
 
           <View className="mt-6">
-            <View className="flex-row items-center gap-3">
-              <AppText className="text-xs font-semibold tracking-[2px] text-slate-400 dark:text-slate-500">
-                TODAY
+            {isLoading ? (
+              <AppText className="text-sm text-slate-400 dark:text-slate-500">
+                Loading notifications...
               </AppText>
-              <View className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            </View>
+            ) : null}
+            {errorMessage ? (
+              <AppText className="mt-3 text-sm text-red-500">
+                {errorMessage}
+              </AppText>
+            ) : null}
 
             <View className="mt-4 gap-4">
-              <View className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900">
-                <View className="flex-row items-start gap-4">
-                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-500/20">
-                    <Ionicons name="chatbox" size={18} color={colors.accent} />
-                  </View>
-                  <View className="flex-1">
-                    <View className="flex-row items-center justify-between">
-                      <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        New comment on your rant
-                      </AppText>
-                      <View className="h-2 w-2 rounded-full bg-emerald-500" />
-                    </View>
-                    <AppText className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                      Alex B. commented: "Seriously, the library hours need to
-                      be extended..."
-                    </AppText>
-                    <AppText className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-                      2m ago
-                    </AppText>
-                  </View>
-                </View>
-              </View>
+              {notifications.map((item) => {
+                const tone = getNotificationTone(item.type);
 
-              <View className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900">
-                <View className="flex-row items-start gap-4">
-                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 dark:bg-violet-500/20">
-                    <Ionicons name="rocket" size={18} color="#7C3AED" />
-                  </View>
-                  <View className="flex-1">
-                    <View className="flex-row items-center justify-between">
-                      <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        Project Update
-                      </AppText>
-                      <View className="h-2 w-2 rounded-full bg-emerald-500" />
+                return (
+                  <View
+                    key={item.id}
+                    className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900"
+                  >
+                    <View className="flex-row items-start gap-4">
+                      <View
+                        className={`h-12 w-12 items-center justify-center rounded-2xl ${tone.bg} dark:bg-opacity-20`}
+                      >
+                        <Ionicons
+                          name={tone.icon as keyof typeof Ionicons.glyphMap}
+                          size={18}
+                          color={tone.color}
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <View className="flex-row items-center justify-between">
+                          <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            {item.title}
+                          </AppText>
+                          {!item.is_read ? (
+                            <View className="h-2 w-2 rounded-full bg-emerald-500" />
+                          ) : null}
+                        </View>
+                        {item.body ? (
+                          <AppText className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                            {item.body}
+                          </AppText>
+                        ) : null}
+                        <AppText className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+                          {formatTimeAgo(item.created_at)}
+                        </AppText>
+                      </View>
                     </View>
-                    <AppText className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                      New milestone added to "CS Study Group". Check out the
-                      latest tasks...
-                    </AppText>
-                    <AppText className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-                      3h ago
-                    </AppText>
                   </View>
-                </View>
-              </View>
-
-              <View className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900">
-                <View className="flex-row items-start gap-4">
-                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 dark:bg-rose-500/20">
-                    <Ionicons name="heart" size={18} color="#E11D48" />
-                  </View>
-                  <View className="flex-1">
-                    <View className="flex-row items-center justify-between">
-                      <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        Spot trending!
-                      </AppText>
-                    </View>
-                    <AppText className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                      Your photo of the Main Gate just reached 50 likes.
-                    </AppText>
-                    <View className="mt-3">
-                      <Image
-                        source={{
-                          uri: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=300&q=80",
-                        }}
-                        className="h-16 w-16 rounded-xl"
-                        resizeMode="cover"
-                      />
-                    </View>
-                    <AppText className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-                      5h ago
-                    </AppText>
-                  </View>
-                </View>
-              </View>
+                );
+              })}
             </View>
           </View>
 
-          <View className="mt-8">
-            <View className="flex-row items-center gap-3">
-              <AppText className="text-xs font-semibold tracking-[2px] text-slate-400 dark:text-slate-500">
-                YESTERDAY
+          {!isLoading && notifications.length === 0 ? (
+            <View className="mt-8 items-center pb-6">
+              <View className="h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                <Ionicons
+                  name="checkmark"
+                  size={22}
+                  color={colors.mutedStrong}
+                />
+              </View>
+              <AppText className="mt-3 text-sm text-slate-400 dark:text-slate-500">
+                You're all caught up!
               </AppText>
-              <View className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
             </View>
-
-            <View className="mt-4 gap-4">
-              <View className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900">
-                <View className="flex-row items-start gap-4">
-                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 dark:bg-orange-500/20">
-                    <Ionicons name="calendar" size={18} color="#F97316" />
-                  </View>
-                  <View className="flex-1">
-                    <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      Event Reminder
-                    </AppText>
-                    <AppText className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                      "Freshman Welcome Party" was scheduled for yesterday at
-                      4:00 PM.
-                    </AppText>
-                    <AppText className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-                      1d ago
-                    </AppText>
-                  </View>
-                </View>
-              </View>
-
-              <View className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900">
-                <View className="flex-row items-start gap-4">
-                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800">
-                    <Ionicons
-                      name="alert-circle"
-                      size={18}
-                      color={colors.mutedText}
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      System Maintenance
-                    </AppText>
-                    <AppText className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                      The app will be undergoing scheduled maintenance this...
-                    </AppText>
-                    <AppText className="mt-3 text-xs text-slate-400 dark:text-slate-500">
-                      1d ago
-                    </AppText>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          <View className="mt-8 items-center pb-6">
-            <View className="h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-              <Ionicons name="checkmark" size={22} color={colors.mutedStrong} />
-            </View>
-            <AppText className="mt-3 text-sm text-slate-400 dark:text-slate-500">
-              You're all caught up!
-            </AppText>
-          </View>
+          ) : null}
         </ScrollView>
       </View>
     </SafeAreaView>

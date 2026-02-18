@@ -18,6 +18,7 @@ type EventDetail = {
   address: string | null;
   cover_url: string | null;
   tags: string[] | null;
+  attendees_count: number;
   host_name: string | null;
 };
 
@@ -50,6 +51,9 @@ export default function EventDetailsScreen() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isGoing, setIsGoing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,11 +63,12 @@ export default function EventDetailsScreen() {
 
       setIsLoading(true);
       setErrorMessage(null);
+      setIsGoing(false);
 
       const { data, error } = await supabase
         .from("events")
         .select(
-          "id, title, description, start_at, end_at, location, address, cover_url, tags, host_name",
+          "id, title, description, start_at, end_at, location, address, cover_url, tags, attendees_count, host_name",
         )
         .eq("id", id)
         .maybeSingle();
@@ -80,12 +85,116 @@ export default function EventDetailsScreen() {
       setIsLoading(false);
     };
 
+    const loadGoingStatus = async () => {
+      if (!id) return;
+
+      const { data: authData, error: authError } =
+        await supabase.auth.getUser();
+
+      if (!isMounted) return;
+
+      if (authError) {
+        setUserId(null);
+        return;
+      }
+
+      const currentUserId = authData?.user?.id ?? null;
+      setUserId(currentUserId);
+
+      if (!currentUserId) {
+        setIsGoing(false);
+        return;
+      }
+
+      const { data: existing, error: existingError } = await supabase
+        .from("event_attendees")
+        .select("event_id")
+        .eq("event_id", id)
+        .eq("user_id", currentUserId)
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      if (!existingError && existing) {
+        setIsGoing(true);
+      } else {
+        setIsGoing(false);
+      }
+    };
+
     loadEvent();
+    loadGoingStatus();
 
     return () => {
       isMounted = false;
     };
   }, [id]);
+
+  const handleGoing = async () => {
+    if (!event || isUpdating || isGoing) return;
+
+    setIsUpdating(true);
+    setErrorMessage(null);
+
+    const currentUserId =
+      userId ?? (await supabase.auth.getUser()).data.user?.id;
+
+    if (!currentUserId) {
+      setErrorMessage("Sign in to mark yourself as going.");
+      setIsUpdating(false);
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("add_event_attendee", {
+      p_event_id: event.id,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+    } else {
+      setEvent({
+        ...event,
+        attendees_count:
+          typeof data === "number" ? data : (event.attendees_count ?? 0),
+      });
+      setIsGoing(true);
+    }
+
+    setIsUpdating(false);
+  };
+
+  const handleCancelGoing = async () => {
+    if (!event || isUpdating || !isGoing) return;
+
+    setIsUpdating(true);
+    setErrorMessage(null);
+
+    const currentUserId =
+      userId ?? (await supabase.auth.getUser()).data.user?.id;
+
+    if (!currentUserId) {
+      setErrorMessage("Sign in to manage attendance.");
+      setIsUpdating(false);
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("remove_event_attendee", {
+      p_event_id: event.id,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+    } else {
+      setEvent({
+        ...event,
+        attendees_count:
+          typeof data === "number" ? data : (event.attendees_count ?? 0),
+      });
+      setIsGoing(false);
+    }
+
+    setIsUpdating(false);
+  };
 
   const dateBadge = useMemo(() => {
     if (!event?.start_at) return { month: "TBD", day: "--" };
@@ -107,7 +216,7 @@ export default function EventDetailsScreen() {
               onPress={() => router.back()}
               className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
             >
-              <Feather name="arrow-left" size={24} color="black" />{" "}
+              <Feather name="arrow-left" size={24} color="black" />
             </Pressable>
 
             <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -211,7 +320,7 @@ export default function EventDetailsScreen() {
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center">
                   <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                    0
+                    {event?.attendees_count ?? 0}
                   </AppText>
                 </View>
                 <AppText className="text-xs text-slate-500 dark:text-slate-400">
@@ -249,9 +358,19 @@ export default function EventDetailsScreen() {
         </ScrollView>
 
         <View className="absolute bottom-0 left-0 right-0 flex-row items-center gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
-          <Pressable className="flex-1 items-center justify-center rounded-xl bg-green-600 py-3">
-            <AppText className="text-sm font-semibold text-white">
-              I'm Going
+          <Pressable
+            onPress={isGoing ? handleCancelGoing : handleGoing}
+            disabled={isUpdating}
+            className={`flex-1 items-center justify-center rounded-xl py-3 ${
+              isGoing ? "bg-slate-200 dark:bg-slate-800" : "bg-green-600"
+            } ${isUpdating ? "opacity-60" : ""}`}
+          >
+            <AppText
+              className={`text-sm font-semibold ${
+                isGoing ? "text-slate-900 dark:text-slate-100" : "text-white"
+              }`}
+            >
+              {isGoing ? "Cancel Going" : "I'm Going"}
             </AppText>
           </Pressable>
           <Pressable className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -262,3 +381,4 @@ export default function EventDetailsScreen() {
     </SafeAreaView>
   );
 }
+

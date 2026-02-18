@@ -5,7 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
-import Feather from "@expo/vector-icons/build/Feather";
+import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 
@@ -18,8 +18,37 @@ export default function CreateEventScreen() {
   const [hostName, setHostName] = useState("");
   const [details, setDetails] = useState("");
   const [feeType, setFeeType] = useState<"free" | "paid">("free");
+  const [feeAmount, setFeeAmount] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [tagsText, setTagsText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const parseDateTime = (datePart: string, timePartRaw: string) => {
+    const dateTrimmed = datePart.trim();
+    const timeTrimmed = timePartRaw.trim();
+    if (!dateTrimmed || !timeTrimmed) return null;
+
+    const timePart =
+      timeTrimmed.length === 5 ? `${timeTrimmed}:00` : timeTrimmed;
+    const normalized = `${dateTrimmed}T${timePart}`;
+    const parsed = new Date(normalized);
+
+    if (Number.isNaN(parsed.getTime())) return "INVALID";
+
+    const pad = (num: number) => num.toString().padStart(2, "0");
+    const offsetMinutes = -parsed.getTimezoneOffset();
+    const sign = offsetMinutes >= 0 ? "+" : "-";
+    const absMinutes = Math.abs(offsetMinutes);
+    const offset = `${sign}${pad(Math.floor(absMinutes / 60))}:${pad(
+      absMinutes % 60,
+    )}`;
+
+    return `${dateTrimmed}T${timePart}${offset}`;
+  };
 
   const handleSubmit = async () => {
     if (!session?.user) {
@@ -32,6 +61,25 @@ export default function CreateEventScreen() {
       return;
     }
 
+    if (feeType === "paid" && !feeAmount.trim()) {
+      setErrorMessage("Enter the entry fee amount.");
+      return;
+    }
+
+    const parsedFee = feeAmount.trim() ? Number(feeAmount.trim()) : null;
+    if (feeType === "paid" && (parsedFee === null || Number.isNaN(parsedFee))) {
+      setErrorMessage("Entry fee must be a number.");
+      return;
+    }
+
+    const startAtValue = parseDateTime(startDate, startTime);
+    const endAtValue = parseDateTime(endDate, endTime);
+
+    if (startAtValue === "INVALID" || endAtValue === "INVALID") {
+      setErrorMessage("Use format YYYY-MM-DD and HH:mm (LT).");
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -39,9 +87,16 @@ export default function CreateEventScreen() {
       user_id: session.user.id,
       title: title.trim(),
       description: details.trim() || null,
+      tags: tagsText
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      start_at: startAtValue === "INVALID" ? null : startAtValue,
+      end_at: endAtValue === "INVALID" ? null : endAtValue,
       location: location.trim() || null,
       host_name: hostName.trim() || null,
       fee_type: feeType,
+      fee_amount: feeType === "paid" ? parsedFee : null,
     });
 
     setIsSubmitting(false);
@@ -63,7 +118,7 @@ export default function CreateEventScreen() {
             onPress={() => router.back()}
             className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
           >
-            <Feather name="arrow-left" size={24} color="black" />{" "}
+            <Feather name="arrow-left" size={24} color="black" />
           </Pressable>
 
           <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -101,16 +156,72 @@ export default function CreateEventScreen() {
           <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             When
           </AppText>
-          <Pressable className="mt-2 flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <AppText className="text-sm text-slate-900 dark:text-slate-100">
-              Select Date & Time
-            </AppText>
-            <Ionicons
-              name="calendar-outline"
-              size={18}
-              color={colors.mutedText}
-            />
-          </Pressable>
+          <View className="mt-2 gap-3">
+            <View className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <Ionicons
+                name="calendar-outline"
+                size={18}
+                color={colors.mutedText}
+              />
+              <TextInput
+                placeholder="Start date (YYYY-MM-DD)"
+                placeholderTextColor={colors.mutedStrong}
+                className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                value={startDate}
+                onChangeText={setStartDate}
+              />
+              <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                LT
+              </AppText>
+            </View>
+            <View className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <Ionicons
+                name="calendar-outline"
+                size={18}
+                color={colors.mutedText}
+              />
+              <TextInput
+                placeholder="End date (YYYY-MM-DD)"
+                placeholderTextColor={colors.mutedStrong}
+                className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                value={endDate}
+                onChangeText={setEndDate}
+              />
+              <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                LT
+              </AppText>
+            </View>
+            <View className="flex-row gap-3">
+              <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <Ionicons
+                  name="time-outline"
+                  size={18}
+                  color={colors.mutedText}
+                />
+                <TextInput
+                  placeholder="Start (HH:mm)"
+                  placeholderTextColor={colors.mutedStrong}
+                  className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                  value={startTime}
+                  onChangeText={setStartTime}
+                />
+              </View>
+              <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <Ionicons
+                  name="time-outline"
+                  size={18}
+                  color={colors.mutedText}
+                />
+                <TextInput
+                  placeholder="End (HH:mm)"
+                  placeholderTextColor={colors.mutedStrong}
+                  className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                  value={endTime}
+                  onChangeText={setEndTime}
+                />
+              </View>
+            </View>
+          </View>
 
           <View className="mt-6 flex-row items-center justify-between">
             <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
@@ -181,38 +292,53 @@ export default function CreateEventScreen() {
           <View className="mt-2 flex-row rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
             <Pressable
               onPress={() => setFeeType("free")}
-              className={`flex-1 items-center justify-center rounded-lg py-2.5 ${
-                feeType === "free"
-                  ? "bg-white shadow-sm dark:bg-slate-950"
-                  : "bg-transparent"
-              }`}
+              className="flex-1 items-center justify-center rounded-lg py-2.5"
+              style={{
+                backgroundColor:
+                  feeType === "free" ? colors.card : "transparent",
+              }}
             >
               <AppText
-                className={`text-sm font-semibold ${
-                  feeType === "free"
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-slate-500 dark:text-slate-400"
-                }`}
+                className="text-sm font-semibold"
+                style={{
+                  color: feeType === "free" ? colors.accent : colors.mutedText,
+                }}
               >
                 Free
               </AppText>
             </Pressable>
             <Pressable
               onPress={() => setFeeType("paid")}
-              className={`flex-1 items-center justify-center rounded-lg py-2.5 ${
-                feeType === "paid" ? "bg-white shadow-sm dark:bg-slate-950" : ""
-              }`}
+              className="flex-1 items-center justify-center rounded-lg py-2.5"
+              style={{
+                backgroundColor:
+                  feeType === "paid" ? colors.card : "transparent",
+              }}
             >
               <AppText
-                className={`text-sm font-semibold ${
-                  feeType === "paid"
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-slate-500 dark:text-slate-400"
-                }`}
+                className="text-sm font-semibold"
+                style={{
+                  color: feeType === "paid" ? colors.accent : colors.mutedText,
+                }}
               >
                 Paid
               </AppText>
             </Pressable>
+          </View>
+
+          <View
+            className="mt-3 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            style={{ display: feeType === "paid" ? "flex" : "none" }}
+          >
+            <Ionicons name="cash-outline" size={18} color={colors.mutedText} />
+            <TextInput
+              placeholder="Entry fee amount (ETB)"
+              placeholderTextColor={colors.mutedStrong}
+              className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+              keyboardType="numeric"
+              value={feeAmount}
+              onChangeText={setFeeAmount}
+            />
           </View>
 
           <View className="mt-6 flex-row items-center gap-2">
@@ -222,6 +348,25 @@ export default function CreateEventScreen() {
             <AppText className="text-xs text-slate-400 dark:text-slate-500">
               (optional)
             </AppText>
+          </View>
+          <View className="mt-4">
+            <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Tags
+            </AppText>
+            <View className="mt-2 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <Ionicons
+                name="pricetag-outline"
+                size={18}
+                color={colors.mutedText}
+              />
+              <TextInput
+                placeholder="Add tags (comma separated)"
+                placeholderTextColor={colors.mutedStrong}
+                className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                value={tagsText}
+                onChangeText={setTagsText}
+              />
+            </View>
           </View>
           <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <TextInput
@@ -260,3 +405,4 @@ export default function CreateEventScreen() {
     </SafeAreaView>
   );
 }
+

@@ -156,7 +156,7 @@ export default function RantCommentsScreen() {
               onPress={() => router.back()}
               className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
             >
-              <Feather name="arrow-left" size={24} color="black" />{" "}
+              <Feather name="arrow-left" size={24} color="black" />
             </Pressable>
 
             <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -274,3 +274,4 @@ export default function RantCommentsScreen() {
     </SafeAreaView>
   );
 }
+

@@ -5,11 +5,25 @@ alter table public.profiles enable row level security;
 alter table public.rants enable row level security;
 alter table public.rant_comments enable row level security;
 alter table public.events enable row level security;
+alter table public.event_attendees enable row level security;
 alter table public.spots enable row level security;
 alter table public.spot_reviews enable row level security;
 alter table public.projects enable row level security;
 alter table public.notifications enable row level security;
 alter table public.reports enable row level security;
+
+-- Admin helper (replace emails with real admin emails)
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+as $$
+  select lower(coalesce(auth.jwt() ->> 'email', '')) = any (
+    array[
+      'admin@example.com'
+    ]
+  );
+$$;
 
 -- Profiles
 create policy "profiles_public_read"
@@ -50,6 +64,11 @@ create policy "rants_owner_delete"
   for delete
   using (auth.uid() = user_id);
 
+create policy "rants_admin_delete"
+  on public.rants
+  for delete
+  using (public.is_admin());
+
 -- Rant comments
 create policy "rant_comments_public_read"
   on public.rant_comments
@@ -72,6 +91,11 @@ create policy "rant_comments_owner_delete"
   for delete
   using (auth.uid() = user_id);
 
+create policy "rant_comments_admin_delete"
+  on public.rant_comments
+  for delete
+  using (public.is_admin());
+
 -- Events
 create policy "events_public_read"
   on public.events
@@ -91,6 +115,27 @@ create policy "events_owner_update"
 
 create policy "events_owner_delete"
   on public.events
+  for delete
+  using (auth.uid() = user_id);
+
+create policy "events_admin_delete"
+  on public.events
+  for delete
+  using (public.is_admin());
+
+-- Event attendees
+create policy "event_attendees_owner_read"
+  on public.event_attendees
+  for select
+  using (auth.uid() = user_id);
+
+create policy "event_attendees_owner_insert"
+  on public.event_attendees
+  for insert
+  with check (auth.uid() = user_id);
+
+create policy "event_attendees_owner_delete"
+  on public.event_attendees
   for delete
   using (auth.uid() = user_id);
 
@@ -115,6 +160,11 @@ create policy "spots_owner_delete"
   on public.spots
   for delete
   using (auth.uid() = user_id);
+
+create policy "spots_admin_delete"
+  on public.spots
+  for delete
+  using (public.is_admin());
 
 -- Spot reviews
 create policy "spot_reviews_public_read"
@@ -160,6 +210,11 @@ create policy "projects_owner_delete"
   for delete
   using (auth.uid() = user_id);
 
+create policy "projects_admin_delete"
+  on public.projects
+  for delete
+  using (public.is_admin());
+
 -- Notifications
 create policy "notifications_owner_read"
   on public.notifications
@@ -182,3 +237,14 @@ create policy "reports_owner_read"
   on public.reports
   for select
   using (auth.uid() = reporter_id);
+
+create policy "reports_admin_read"
+  on public.reports
+  for select
+  using (public.is_admin());
+
+create policy "reports_admin_update"
+  on public.reports
+  for update
+  using (public.is_admin())
+  with check (public.is_admin());

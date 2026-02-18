@@ -8,14 +8,16 @@ import { useTheme } from "../../hooks/useTheme";
 import { useColorScheme } from "react-native";
 import { supabase } from "../../lib/supabase";
 
-const dateChips = [
-  { id: "d1", day: "OCT", date: "12", active: true },
-  { id: "d2", day: "OCT", date: "13" },
-  { id: "d3", day: "OCT", date: "14" },
-  { id: "d4", day: "OCT", date: "15" },
-  { id: "d5", day: "OCT", date: "16" },
-  { id: "d6", day: "OCT", date: "17" },
-];
+const buildDateChips = (count: number) =>
+  Array.from({ length: count }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() + index);
+    return {
+      id: `d${index + 1}`,
+      day: date.toLocaleString(undefined, { month: "short" }).toUpperCase(),
+      date: date.getDate().toString(),
+    };
+  });
 
 type EventItem = {
   id: string;
@@ -25,6 +27,7 @@ type EventItem = {
   location: string | null;
   cover_url: string | null;
   fee_type: string | null;
+  fee_amount: number | null;
   host_name: string | null;
 };
 
@@ -194,6 +197,9 @@ export default function EventTabScreen() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedDateIndex, setSelectedDateIndex] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
+  const [feeFilter, setFeeFilter] = useState<"All" | "Free" | "Paid">("All");
 
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
@@ -212,7 +218,7 @@ export default function EventTabScreen() {
       const { data, error } = await supabase
         .from("events")
         .select(
-          "id, title, start_at, end_at, location, cover_url, fee_type, host_name",
+          "id, title, start_at, end_at, location, cover_url, fee_type, fee_amount, host_name",
         )
         .order("start_at", { ascending: true });
 
@@ -235,12 +241,18 @@ export default function EventTabScreen() {
     };
   }, []);
 
+  const dateChips = useMemo(() => buildDateChips(6), []);
+
   const { todayEvents, nextWeekEvents } = useMemo(() => {
     const today = new Date();
     const todayList: EventItem[] = [];
     const nextList: EventItem[] = [];
+    const filteredEvents = events.filter((event) => {
+      if (feeFilter === "All") return true;
+      return (event.fee_type ?? "").toLowerCase() === feeFilter.toLowerCase();
+    });
 
-    events.forEach((event) => {
+    filteredEvents.forEach((event) => {
       if (!event.start_at) {
         nextList.push(event);
         return;
@@ -258,7 +270,7 @@ export default function EventTabScreen() {
     });
 
     return { todayEvents: todayList, nextWeekEvents: nextList };
-  }, [events]);
+  }, [events, feeFilter]);
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -297,28 +309,59 @@ export default function EventTabScreen() {
               className="flex-1 text-sm text-slate-900 dark:text-slate-100"
             />
           </View>
-          <Pressable className="h-12 w-12 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-400/20">
+          <Pressable
+            onPress={() => setShowFilters((prev) => !prev)}
+            className="h-12 w-12 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-400/20"
+          >
             <Ionicons name="options-outline" size={20} color={colors.accent} />
           </Pressable>
         </View>
+
+        {showFilters ? (
+          <View className="mt-3 flex-row gap-2">
+            {(["All", "Free", "Paid"] as const).map((option) => {
+              const isActive = feeFilter === option;
+              return (
+                <Pressable
+                  key={option}
+                  onPress={() => setFeeFilter(option)}
+                  className={`rounded-full px-4 py-2 ${
+                    isActive ? "bg-green-600" : "bg-slate-100 dark:bg-slate-900"
+                  }`}
+                >
+                  <AppText
+                    className={`text-xs font-semibold ${
+                      isActive
+                        ? "text-white"
+                        : "text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {option}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
 
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="mt-5 gap-3"
         >
-          {dateChips.map((chip) => (
+          {dateChips.map((chip, index) => (
             <Pressable
               key={chip.id}
+              onPress={() => setSelectedDateIndex(index)}
               className={`h-16 w-16 items-center justify-center rounded-2xl border ${
-                chip.active
+                index === selectedDateIndex
                   ? "border-green-600 bg-green-600"
                   : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
               }`}
             >
               <AppText
                 className={`text-[11px] font-semibold ${
-                  chip.active
+                  index === selectedDateIndex
                     ? "text-white"
                     : "text-slate-400 dark:text-slate-500"
                 }`}
@@ -327,7 +370,7 @@ export default function EventTabScreen() {
               </AppText>
               <AppText
                 className={`text-lg font-semibold ${
-                  chip.active
+                  index === selectedDateIndex
                     ? "text-white"
                     : "text-slate-900 dark:text-slate-100"
                 }`}
@@ -362,7 +405,13 @@ export default function EventTabScreen() {
               title={event.title}
               time={formatEventTime(event.start_at, event.end_at)}
               location={event.location ?? "Location TBD"}
-              price={event.fee_type?.toLowerCase() === "paid" ? "Paid" : "Free"}
+              price={
+                event.fee_type?.toLowerCase() === "paid"
+                  ? event.fee_amount
+                    ? `${event.fee_amount} ETB`
+                    : "Paid"
+                  : "Free"
+              }
               image={event.cover_url ?? fallbackEventImage}
               badge="Today"
               host={event.host_name ? `By ${event.host_name}` : undefined}
@@ -382,7 +431,13 @@ export default function EventTabScreen() {
               title={event.title}
               time={formatEventTime(event.start_at, event.end_at)}
               location={event.location ?? "Location TBD"}
-              price={event.fee_type?.toLowerCase() === "paid" ? "Paid" : "Free"}
+              price={
+                event.fee_type?.toLowerCase() === "paid"
+                  ? event.fee_amount
+                    ? `${event.fee_amount} ETB`
+                    : "Paid"
+                  : "Free"
+              }
               image={event.cover_url ?? fallbackEventImage}
               host={event.host_name ? `By ${event.host_name}` : undefined}
               iconColor={iconColor}

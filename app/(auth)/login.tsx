@@ -7,6 +7,7 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
+import { isAdminEmail } from "../../constants/admin";
 
 export default function LoginScreen() {
   const { colors, statusBarStyle } = useTheme();
@@ -26,7 +27,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -35,6 +36,12 @@ export default function LoginScreen() {
 
     if (error) {
       setErrorMessage(error.message);
+      return;
+    }
+
+    const signedInEmail = data.user?.email ?? data.session?.user?.email;
+    if (isAdminEmail(signedInEmail)) {
+      router.replace("/admin");
       return;
     }
 

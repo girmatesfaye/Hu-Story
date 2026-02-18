@@ -6,18 +6,34 @@ import { useRouter } from "expo-router";
 import { AppText } from "../components/AppText";
 import { useTheme } from "../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSupabase } from "../providers/SupabaseProvider";
+import { isAdminEmail } from "../constants/admin";
 
 export default function SplashScreen() {
   const { colors, statusBarStyle } = useTheme();
   const router = useRouter();
+  const { session, isLoading } = useSupabase();
 
   useEffect(() => {
+    if (isLoading) return;
+
     const timeout = setTimeout(() => {
+      const email = session?.user?.email ?? null;
+      if (email && isAdminEmail(email)) {
+        router.replace("/admin");
+        return;
+      }
+
+      if (session) {
+        router.replace("/(tabs)/rants");
+        return;
+      }
+
       router.replace("../(auth)/register");
-    }, 1600);
+    }, 1200);
 
     return () => clearTimeout(timeout);
-  }, [router]);
+  }, [router, session, isLoading]);
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
