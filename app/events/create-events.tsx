@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -6,10 +6,53 @@ import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import Feather from "@expo/vector-icons/build/Feather";
+import { supabase } from "../../lib/supabase";
+import { useSupabase } from "../../providers/SupabaseProvider";
 
 export default function CreateEventScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { session } = useSupabase();
+  const [title, setTitle] = useState("");
+  const [location, setLocation] = useState("");
+  const [hostName, setHostName] = useState("");
+  const [details, setDetails] = useState("");
+  const [feeType, setFeeType] = useState<"free" | "paid">("free");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!session?.user) {
+      setErrorMessage("Please log in to create an event.");
+      return;
+    }
+
+    if (!title.trim()) {
+      setErrorMessage("Add a title for your event.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    const { error } = await supabase.from("events").insert({
+      user_id: session.user.id,
+      title: title.trim(),
+      description: details.trim() || null,
+      location: location.trim() || null,
+      host_name: hostName.trim() || null,
+      fee_type: feeType,
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    router.replace("/(tabs)/events");
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
@@ -50,6 +93,8 @@ export default function CreateEventScreen() {
               placeholder="e.g., Graduation Party"
               placeholderTextColor={colors.mutedStrong}
               className="text-sm text-slate-900 dark:text-slate-100"
+              value={title}
+              onChangeText={setTitle}
             />
           </View>
 
@@ -83,6 +128,8 @@ export default function CreateEventScreen() {
               placeholder="e.g., Main Campus Hall"
               placeholderTextColor={colors.mutedStrong}
               className="text-sm text-slate-900 dark:text-slate-100"
+              value={location}
+              onChangeText={setLocation}
             />
           </View>
 
@@ -122,6 +169,8 @@ export default function CreateEventScreen() {
                 placeholder="Club or Individual Name"
                 placeholderTextColor={colors.mutedStrong}
                 className="text-sm text-slate-900 dark:text-slate-100"
+                value={hostName}
+                onChangeText={setHostName}
               />
             </View>
           </View>
@@ -130,13 +179,37 @@ export default function CreateEventScreen() {
             Entry Fee
           </AppText>
           <View className="mt-2 flex-row rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
-            <Pressable className="flex-1 items-center justify-center rounded-lg bg-white py-2.5 shadow-sm dark:bg-slate-950">
-              <AppText className="text-sm font-semibold text-green-600 dark:text-green-400">
+            <Pressable
+              onPress={() => setFeeType("free")}
+              className={`flex-1 items-center justify-center rounded-lg py-2.5 ${
+                feeType === "free"
+                  ? "bg-white shadow-sm dark:bg-slate-950"
+                  : "bg-transparent"
+              }`}
+            >
+              <AppText
+                className={`text-sm font-semibold ${
+                  feeType === "free"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
                 Free
               </AppText>
             </Pressable>
-            <Pressable className="flex-1 items-center justify-center rounded-lg py-2.5">
-              <AppText className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+            <Pressable
+              onPress={() => setFeeType("paid")}
+              className={`flex-1 items-center justify-center rounded-lg py-2.5 ${
+                feeType === "paid" ? "bg-white shadow-sm dark:bg-slate-950" : ""
+              }`}
+            >
+              <AppText
+                className={`text-sm font-semibold ${
+                  feeType === "paid"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
                 Paid
               </AppText>
             </Pressable>
@@ -157,14 +230,28 @@ export default function CreateEventScreen() {
               className="min-h-[110px] text-sm text-slate-900 dark:text-slate-100"
               multiline
               textAlignVertical="top"
+              value={details}
+              onChangeText={setDetails}
             />
           </View>
+
+          {errorMessage ? (
+            <AppText className="mt-4 text-sm text-red-500">
+              {errorMessage}
+            </AppText>
+          ) : null}
         </ScrollView>
 
         <View className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
-          <Pressable className="flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3">
+          <Pressable
+            onPress={handleSubmit}
+            className={`flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 ${
+              isSubmitting ? "opacity-60" : ""
+            }`}
+            disabled={isSubmitting}
+          >
             <AppText className="text-sm font-semibold text-white">
-              Post Event
+              {isSubmitting ? "Posting..." : "Post Event"}
             </AppText>
             <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
           </Pressable>

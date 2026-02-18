@@ -8,19 +8,86 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../lib/supabase";
+import { useSupabase } from "../../providers/SupabaseProvider";
 
 export default function EditProfileScreen() {
   const { colors, statusBarStyle } = useTheme();
   const router = useRouter();
-  const [fullName, setFullName] = useState("Abebe Kebede");
-  const [username, setUsername] = useState("@abebe_k");
-  const [bio, setBio] = useState(
-    "Final year Computer Science student. Building things for HU. Love the Quiet Study Garden!",
-  );
+  const { session } = useSupabase();
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [campus, setCampus] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      if (!session?.user) return;
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, username, bio, campus")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+
+      if (isMounted) {
+        setFullName(data?.full_name ?? "");
+        setUsername(data?.username ?? "");
+        setBio(data?.bio ?? "");
+        setCampus(
+          data?.campus ??
+            session.user.user_metadata?.campus ??
+            "Hawassa University",
+        );
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.user]);
+
+  const handleSave = async () => {
+    if (!session?.user) {
+      setErrorMessage("You are not signed in.");
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const { error } = await supabase.from("profiles").upsert(
+      {
+        user_id: session.user.id,
+        full_name: fullName.trim() || null,
+        username: username.trim() || null,
+        bio: bio.trim() || null,
+        campus: campus.trim() || null,
+      },
+      { onConflict: "user_id" },
+    );
+
+    setIsSaving(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setSuccessMessage("Profile updated.");
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -38,9 +105,13 @@ export default function EditProfileScreen() {
           <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
             Edit Profile
           </AppText>
-          <TouchableOpacity accessibilityRole="button">
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={handleSave}
+            disabled={isSaving}
+          >
             <AppText className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-              Save
+              {isSaving ? "Saving..." : "Save"}
             </AppText>
           </TouchableOpacity>
         </View>
@@ -114,7 +185,7 @@ export default function EditProfileScreen() {
             </AppText>
             <View className="mt-3 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
               <TextInput
-                value="Hawassa University"
+                value={campus}
                 editable={false}
                 className="flex-1 text-sm text-slate-400 dark:text-slate-500"
               />
@@ -128,6 +199,17 @@ export default function EditProfileScreen() {
               Campus is verified based on your student email.
             </AppText>
           </View>
+
+          {errorMessage ? (
+            <AppText className="mt-4 text-sm text-red-500">
+              {errorMessage}
+            </AppText>
+          ) : null}
+          {successMessage ? (
+            <AppText className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">
+              {successMessage}
+            </AppText>
+          ) : null}
 
           <TouchableOpacity
             className="mt-8 flex-row items-center justify-between border-t border-slate-200 py-4 dark:border-slate-800"

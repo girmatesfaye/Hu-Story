@@ -6,9 +6,57 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Pressable } from "react-native";
+import { useState } from "react";
+import { supabase } from "../../lib/supabase";
+import { useSupabase } from "../../providers/SupabaseProvider";
 export default function CreateProjectsScreen() {
   const router = useRouter();
   const { colors, statusBarStyle } = useTheme();
+  const { session } = useSupabase();
+  const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
+  const [tagsText, setTagsText] = useState("");
+  const [repoUrl, setRepoUrl] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!session?.user) {
+      setErrorMessage("Please log in to publish a project.");
+      return;
+    }
+
+    if (!title.trim()) {
+      setErrorMessage("Add a project title.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    const tags = tagsText
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    const { error } = await supabase.from("projects").insert({
+      user_id: session.user.id,
+      title: title.trim(),
+      summary: summary.trim() || null,
+      details: null,
+      tags: tags.length > 0 ? tags : null,
+      repo_url: repoUrl.trim() || null,
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    router.replace("/(tabs)/projects");
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
@@ -59,6 +107,8 @@ export default function CreateProjectsScreen() {
                 placeholder="e.g., Campus Bus Tracker"
                 placeholderTextColor={colors.mutedStrong}
                 className="text-sm text-slate-900 dark:text-slate-100"
+                value={title}
+                onChangeText={setTitle}
               />
             </View>
           </View>
@@ -75,11 +125,13 @@ export default function CreateProjectsScreen() {
                 multiline
                 textAlignVertical="top"
                 maxLength={300}
+                value={summary}
+                onChangeText={setSummary}
               />
             </View>
             <View className="mt-2 items-end">
               <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                0/300
+                {summary.length}/300
               </AppText>
             </View>
           </View>
@@ -89,23 +141,13 @@ export default function CreateProjectsScreen() {
               Tech Stack / Skills
             </AppText>
             <View className="mt-3 flex-row flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
-              <View className="flex-row items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
-                <AppText className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">
-                  React Native
-                </AppText>
-                <Ionicons name="close" size={12} color={colors.accent} />
-              </View>
-              <View className="flex-row items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20">
-                <AppText className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">
-                  Node.js
-                </AppText>
-                <Ionicons name="close" size={12} color={colors.accent} />
-              </View>
               <View className="flex-1">
                 <TextInput
                   placeholder="Add tags..."
                   placeholderTextColor={colors.mutedStrong}
                   className="text-sm text-slate-900 dark:text-slate-100"
+                  value={tagsText}
+                  onChangeText={setTagsText}
                 />
               </View>
             </View>
@@ -124,6 +166,8 @@ export default function CreateProjectsScreen() {
                 placeholder="https://"
                 placeholderTextColor={colors.mutedStrong}
                 className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                value={repoUrl}
+                onChangeText={setRepoUrl}
               />
             </View>
           </View>
@@ -150,12 +194,24 @@ export default function CreateProjectsScreen() {
               </View>
             </TouchableOpacity>
           </View>
+
+          {errorMessage ? (
+            <AppText className="mt-4 text-sm text-red-500">
+              {errorMessage}
+            </AppText>
+          ) : null}
         </ScrollView>
 
         <View className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
-          <Pressable className="flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3">
+          <Pressable
+            onPress={handleSubmit}
+            className={`flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 ${
+              isSubmitting ? "opacity-60" : ""
+            }`}
+            disabled={isSubmitting}
+          >
             <AppText className="text-sm font-semibold text-white">
-              Publish Project
+              {isSubmitting ? "Publishing..." : "Publish Project"}
             </AppText>
             <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
           </Pressable>

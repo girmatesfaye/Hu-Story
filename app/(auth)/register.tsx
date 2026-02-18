@@ -6,12 +6,65 @@ import { useState } from "react";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../../lib/supabase";
 
 export default function RegisterScreen() {
   const { colors, statusBarStyle } = useTheme();
   const router = useRouter();
   const [agreed, setAgreed] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // New: Campus state
+  const [campus, setCampus] = useState("Hawassa University");
+  const [showCampusOptions, setShowCampusOptions] = useState(false);
+  const campusOptions = [
+    "Main",
+    "IOT",
+    "REFFERAL",
+    "WENDOGENET",
+    "AGRI",
+    "BENSA",
+  ];
+
+  const handleRegister = async () => {
+    if (!agreed) {
+      setErrorMessage("Please agree to the campus rules to continue.");
+      return;
+    }
+
+    if (!email.trim() || !password) {
+      setErrorMessage("Enter your email and password.");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: {
+          campus,
+        },
+      },
+    });
+
+    setIsLoading(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setSuccessMessage("Account created. Please check your email to confirm.");
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -38,13 +91,17 @@ export default function RegisterScreen() {
                 </AppText>
               </View>
 
+              {/* ---------- CAMPUS SELECTOR ---------- */}
               <View className="mt-8">
                 <AppText className="text-xs font-semibold tracking-[2px] text-slate-400 dark:text-slate-500">
                   SELECT CAMPUS
                 </AppText>
+
+                {/* Main button */}
                 <TouchableOpacity
                   className="mt-3 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950"
                   accessibilityRole="button"
+                  onPress={() => setShowCampusOptions((prev) => !prev)}
                 >
                   <Ionicons
                     name="location"
@@ -52,16 +109,37 @@ export default function RegisterScreen() {
                     color={colors.mutedText}
                   />
                   <AppText className="flex-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    Hawassa University
+                    {campus}
                   </AppText>
                   <Ionicons
-                    name="chevron-down"
+                    name={showCampusOptions ? "chevron-up" : "chevron-down"}
                     size={18}
                     color={colors.mutedText}
                   />
                 </TouchableOpacity>
+
+                {/* Dropdown options */}
+                {showCampusOptions && (
+                  <View className="mt-1 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+                    {campusOptions.map((option) => (
+                      <TouchableOpacity
+                        key={option}
+                        className="px-4 py-3"
+                        onPress={() => {
+                          setCampus(option);
+                          setShowCampusOptions(false);
+                        }}
+                      >
+                        <AppText className="text-sm text-slate-900 dark:text-slate-100">
+                          {option}
+                        </AppText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
 
+              {/* ---------- CONTACT INFO ---------- */}
               <View className="mt-6">
                 <AppText className="text-xs font-semibold tracking-[2px] text-slate-400 dark:text-slate-500">
                   CONTACT INFO
@@ -73,10 +151,14 @@ export default function RegisterScreen() {
                     placeholderTextColor={colors.mutedStrong}
                     className="flex-1 text-sm text-slate-900 dark:text-slate-100"
                     keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={email}
+                    onChangeText={setEmail}
                   />
                 </View>
               </View>
 
+              {/* ---------- PASSWORD ---------- */}
               <View className="mt-6">
                 <AppText className="text-xs font-semibold tracking-[2px] text-slate-400 dark:text-slate-500">
                   PASSWORD
@@ -92,6 +174,8 @@ export default function RegisterScreen() {
                     placeholderTextColor={colors.mutedStrong}
                     className="flex-1 text-sm text-slate-900 dark:text-slate-100"
                     secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
                   />
                   <TouchableOpacity
                     accessibilityRole="button"
@@ -106,6 +190,7 @@ export default function RegisterScreen() {
                 </View>
               </View>
 
+              {/* ---------- AGREEMENT ---------- */}
               <TouchableOpacity
                 className="mt-6 flex-row items-center gap-3"
                 accessibilityRole="button"
@@ -132,18 +217,35 @@ export default function RegisterScreen() {
                 </AppText>
               </TouchableOpacity>
 
+              {errorMessage ? (
+                <AppText className="mt-4 text-sm text-red-500">
+                  {errorMessage}
+                </AppText>
+              ) : null}
+              {successMessage ? (
+                <AppText className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">
+                  {successMessage}
+                </AppText>
+              ) : null}
+
+              {/* ---------- REGISTER BUTTON ---------- */}
               <TouchableOpacity
-                className="mt-8 h-12 items-center justify-center rounded-2xl bg-emerald-600"
+                className={`mt-8 h-12 items-center justify-center rounded-2xl bg-emerald-600 ${
+                  isLoading ? "opacity-60" : ""
+                }`}
                 accessibilityRole="button"
+                onPress={handleRegister}
+                disabled={isLoading}
               >
                 <View className="flex-row items-center gap-2">
                   <AppText className="text-base font-semibold text-white">
-                    Continue
+                    {isLoading ? "Creating..." : "Continue"}
                   </AppText>
                   <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
                 </View>
               </TouchableOpacity>
 
+              {/* ---------- LOGIN LINK ---------- */}
               <View className="mt-6 flex-row items-center justify-center">
                 <AppText className="text-sm text-slate-500 dark:text-slate-400">
                   Already have an account?
@@ -158,6 +260,7 @@ export default function RegisterScreen() {
                 </TouchableOpacity>
               </View>
 
+              {/* ---------- SOCIAL LOGIN ---------- */}
               <View className="mt-6 flex-row items-center gap-3">
                 <View className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                 <AppText className="text-xs text-slate-400 dark:text-slate-500">
