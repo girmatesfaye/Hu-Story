@@ -3,12 +3,16 @@
 -- Enable RLS
 alter table public.profiles enable row level security;
 alter table public.rants enable row level security;
+alter table public.rant_votes enable row level security;
+alter table public.rant_views enable row level security;
 alter table public.rant_comments enable row level security;
 alter table public.events enable row level security;
 alter table public.event_attendees enable row level security;
 alter table public.spots enable row level security;
 alter table public.spot_reviews enable row level security;
 alter table public.projects enable row level security;
+alter table public.project_likes enable row level security;
+alter table public.project_views enable row level security;
 alter table public.notifications enable row level security;
 alter table public.reports enable row level security;
 alter table public.admin_emails enable row level security;
@@ -69,6 +73,39 @@ create policy "rants_admin_delete"
   on public.rants
   for delete
   using (public.is_admin());
+
+-- Rant votes
+create policy "rant_votes_owner_read"
+  on public.rant_votes
+  for select
+  using (auth.uid() = user_id);
+
+create policy "rant_votes_owner_insert"
+  on public.rant_votes
+  for insert
+  with check (auth.uid() = user_id);
+
+create policy "rant_votes_owner_update"
+  on public.rant_votes
+  for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "rant_votes_owner_delete"
+  on public.rant_votes
+  for delete
+  using (auth.uid() = user_id);
+
+-- Rant views
+create policy "rant_views_owner_read"
+  on public.rant_views
+  for select
+  using (auth.uid() = user_id);
+
+create policy "rant_views_owner_insert"
+  on public.rant_views
+  for insert
+  with check (auth.uid() = user_id);
 
 -- Rant comments
 create policy "rant_comments_public_read"
@@ -215,6 +252,33 @@ create policy "projects_admin_delete"
   on public.projects
   for delete
   using (public.is_admin());
+
+-- Project likes
+create policy "project_likes_owner_read"
+  on public.project_likes
+  for select
+  using (auth.uid() = user_id);
+
+create policy "project_likes_owner_insert"
+  on public.project_likes
+  for insert
+  with check (auth.uid() = user_id);
+
+create policy "project_likes_owner_delete"
+  on public.project_likes
+  for delete
+  using (auth.uid() = user_id);
+
+-- Project views
+create policy "project_views_owner_read"
+  on public.project_views
+  for select
+  using (auth.uid() = user_id);
+
+create policy "project_views_owner_insert"
+  on public.project_views
+  for insert
+  with check (auth.uid() = user_id);
 
 -- Notifications
 create policy "notifications_owner_read"

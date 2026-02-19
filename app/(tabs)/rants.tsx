@@ -18,6 +18,7 @@ const chips = ["All Rants", "Academics", "Dorms", "Cafeteria", "Spots"];
 
 type RantItem = {
   id: string;
+  user_id: string | null;
   category: string | null;
   content: string;
   upvotes: number;
@@ -26,7 +27,16 @@ type RantItem = {
   views: number;
   created_at: string;
   is_anonymous: boolean;
+  user_vote?: number;
+  profile?: {
+    full_name: string | null;
+    username: string | null;
+    avatar_url: string | null;
+  };
 };
+
+const fallbackAvatar =
+  "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=80&q=80";
 
 const formatTimeAgo = (dateString: string) => {
   const date = new Date(dateString);
@@ -56,6 +66,7 @@ export default function RantsScreen() {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
     muted: scheme === "dark" ? "#94A3B8" : "#64748B",
     accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
+    danger: scheme === "dark" ? "#F87171" : "#DC2626",
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
 
@@ -66,7 +77,7 @@ export default function RantsScreen() {
     let query = supabase
       .from("rants")
       .select(
-        "id, category, content, upvotes, downvotes, comment_count, views, created_at, is_anonymous",
+        "id, user_id, category, content, upvotes, downvotes, comment_count, views, created_at, is_anonymous",
       )
       .order("created_at", { ascending: false });
 
@@ -80,11 +91,52 @@ export default function RantsScreen() {
       setErrorMessage(error.message);
       setRants([]);
     } else {
-      setRants((data ?? []) as RantItem[]);
+      const rows = (data ?? []) as RantItem[];
+      const rantIds = rows.map((rant) => rant.id);
+      const userIds = Array.from(
+        new Set(
+          rows
+            .filter((rant) => !rant.is_anonymous && rant.user_id)
+            .map((rant) => rant.user_id as string),
+        ),
+      );
+
+      let profileMap = new Map<string, RantItem["profile"]>();
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name, username, avatar_url")
+          .in("user_id", userIds);
+
+        profileMap = new Map(
+          (profiles ?? []).map((profile) => [profile.user_id, profile]),
+        );
+      }
+
+      let voteMap = new Map<string, number>();
+      if (session?.user?.id && rantIds.length > 0) {
+        const { data: votes } = await supabase
+          .from("rant_votes")
+          .select("rant_id, vote")
+          .in("rant_id", rantIds)
+          .eq("user_id", session.user.id);
+
+        voteMap = new Map(
+          (votes ?? []).map((vote) => [vote.rant_id, vote.vote]),
+        );
+      }
+
+      setRants(
+        rows.map((rant) => ({
+          ...rant,
+          profile: rant.user_id ? profileMap.get(rant.user_id) : undefined,
+          user_vote: voteMap.get(rant.id) ?? 0,
+        })),
+      );
     }
 
     setIsLoading(false);
-  }, [activeChip]);
+  }, [activeChip, session?.user?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -133,6 +185,81 @@ export default function RantsScreen() {
     }
 
     setSelectedReportId(null);
+  };
+
+  const handleVote = async (rantId: string, vote: number) => {
+    if (!session?.user?.id) {
+      setErrorMessage("Please log in to vote.");
+      return;
+    }
+
+    let previousVote = 0;
+    let previousUpvotes = 0;
+    let previousDownvotes = 0;
+    let nextVote = vote;
+
+    setRants((prev) =>
+      prev.map((rant) => {
+        if (rant.id !== rantId) return rant;
+        previousVote = rant.user_vote ?? 0;
+        previousUpvotes = rant.upvotes;
+        previousDownvotes = rant.downvotes;
+        nextVote = previousVote === vote ? 0 : vote;
+
+        let upvotes = rant.upvotes;
+        let downvotes = rant.downvotes;
+
+        if (previousVote === 1) upvotes = Math.max(upvotes - 1, 0);
+        if (previousVote === -1) downvotes = Math.max(downvotes - 1, 0);
+        if (nextVote === 1) upvotes += 1;
+        if (nextVote === -1) downvotes += 1;
+
+        return {
+          ...rant,
+          upvotes,
+          downvotes,
+          user_vote: nextVote,
+        };
+      }),
+    );
+
+    const { data, error } = await supabase.rpc("set_rant_vote", {
+      p_rant_id: rantId,
+      p_vote: nextVote,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setRants((prev) =>
+        prev.map((rant) =>
+          rant.id === rantId
+            ? {
+                ...rant,
+                upvotes: previousUpvotes,
+                downvotes: previousDownvotes,
+                user_vote: previousVote,
+              }
+            : rant,
+        ),
+      );
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row) {
+      setRants((prev) =>
+        prev.map((rant) =>
+          rant.id === rantId
+            ? {
+                ...rant,
+                upvotes: row.upvotes ?? rant.upvotes,
+                downvotes: row.downvotes ?? rant.downvotes,
+                user_vote: row.user_vote ?? rant.user_vote,
+              }
+            : rant,
+        ),
+      );
+    }
   };
 
   return (
@@ -204,22 +331,31 @@ export default function RantsScreen() {
             <AppText className="text-sm text-red-500">{errorMessage}</AppText>
           ) : null}
           {rants.map((rant) => (
-            <View
+            <Pressable
               key={rant.id}
+              onPress={() => router.push(`/rants/${rant.id}`)}
               className="rounded-2xl p-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
             >
               {/* Card Header */}
               <View className="flex-row items-center mb-3">
                 <View className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
                   <Image
-                    source={{ uri: "https://placehold.co/40x40/png" }}
+                    source={{
+                      uri: rant.is_anonymous
+                        ? "https://placehold.co/40x40/png"
+                        : (rant.profile?.avatar_url ?? fallbackAvatar),
+                    }}
                     className="w-full h-full"
                   />
                 </View>
 
                 <View className="flex-1 ml-2.5">
                   <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {rant.is_anonymous ? "Anonymous Student" : "Student"}
+                    {rant.is_anonymous
+                      ? "Anonymous Student"
+                      : rant.profile?.full_name ||
+                        rant.profile?.username ||
+                        "Student"}
                   </AppText>
 
                   <View className="flex-row items-center mt-0.5">
@@ -255,20 +391,41 @@ export default function RantsScreen() {
 
               {/* Actions */}
               <View className="mt-3.5 flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900">
-                  <Ionicons
-                    name="arrow-up"
-                    size={18}
-                    color={iconColors.accent}
-                  />
-                  <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
-                    {rant.upvotes - rant.downvotes}
-                  </AppText>
-                  <Ionicons
-                    name="arrow-down"
-                    size={18}
-                    color={iconColors.muted}
-                  />
+                <View className="flex-row items-center gap-4 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900">
+                  <Pressable
+                    onPress={() => handleVote(rant.id, 1)}
+                    className="flex-row items-center gap-1"
+                  >
+                    <Ionicons
+                      name="arrow-up"
+                      size={18}
+                      color={
+                        rant.user_vote === 1
+                          ? iconColors.accent
+                          : iconColors.muted
+                      }
+                    />
+                    <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
+                      {rant.upvotes}
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleVote(rant.id, -1)}
+                    className="flex-row items-center gap-1"
+                  >
+                    <Ionicons
+                      name="arrow-down"
+                      size={18}
+                      color={
+                        rant.user_vote === -1
+                          ? iconColors.danger
+                          : iconColors.muted
+                      }
+                    />
+                    <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
+                      {rant.downvotes}
+                    </AppText>
+                  </Pressable>
                 </View>
 
                 <View className="flex-row items-center gap-3">
@@ -298,7 +455,7 @@ export default function RantsScreen() {
                   </Pressable>
                 </View>
               </View>
-            </View>
+            </Pressable>
           ))}
         </View>
 

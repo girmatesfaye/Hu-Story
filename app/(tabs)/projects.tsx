@@ -11,6 +11,8 @@ import { supabase } from "../../lib/supabase";
 
 type ProjectItem = {
   id: string;
+  user_id: string | null;
+  is_anonymous: boolean;
   title: string;
   summary: string | null;
   tags: string[] | null;
@@ -18,7 +20,15 @@ type ProjectItem = {
   views: number;
   likes: number;
   cover_url: string | null;
+  profile?: {
+    full_name: string | null;
+    username: string | null;
+    avatar_url: string | null;
+  };
 };
+
+const fallbackAvatar =
+  "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=80&q=80";
 
 const fallbackCover =
   "https://images.unsplash.com/photo-1483721310020-03333e577078?auto=format&fit=crop&w=1200&q=80";
@@ -60,7 +70,9 @@ export default function ProjectsTabScreen() {
 
       const { data, error } = await supabase
         .from("projects")
-        .select("id, title, summary, tags, created_at, views, likes, cover_url")
+        .select(
+          "id, user_id, is_anonymous, title, summary, tags, created_at, views, likes, cover_url",
+        )
         .order("created_at", { ascending: false });
 
       if (!isMounted) return;
@@ -69,7 +81,34 @@ export default function ProjectsTabScreen() {
         setErrorMessage(error.message);
         setProjects([]);
       } else {
-        setProjects((data ?? []) as ProjectItem[]);
+        const rows = (data ?? []) as ProjectItem[];
+        const userIds = Array.from(
+          new Set(
+            rows
+              .filter((project) => !project.is_anonymous && project.user_id)
+              .map((project) => project.user_id as string),
+          ),
+        );
+
+        if (userIds.length === 0) {
+          setProjects(rows);
+        } else {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, full_name, username, avatar_url")
+            .in("user_id", userIds);
+
+          const map = new Map(
+            (profiles ?? []).map((profile) => [profile.user_id, profile]),
+          );
+
+          setProjects(
+            rows.map((project) => ({
+              ...project,
+              profile: project.user_id ? map.get(project.user_id) : undefined,
+            })),
+          );
+        }
       }
 
       setIsLoading(false);
@@ -163,13 +202,23 @@ export default function ProjectsTabScreen() {
               </View>
               <View className="mt-4 flex-row items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
                 <View className="flex-row items-center">
-                  <View className="h-9 w-9 items-center justify-center rounded-full bg-emerald-200 dark:bg-emerald-700">
-                    <AppText className="text-xs font-semibold text-emerald-900 dark:text-emerald-50">
-                      ST
-                    </AppText>
+                  <View className="h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-emerald-200 dark:bg-emerald-700">
+                    <Image
+                      source={{
+                        uri: project.is_anonymous
+                          ? "https://placehold.co/40x40/png"
+                          : (project.profile?.avatar_url ?? fallbackAvatar),
+                      }}
+                      className="h-full w-full"
+                      resizeMode="cover"
+                    />
                   </View>
                   <AppText className="ml-3 text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Student
+                    {project.is_anonymous
+                      ? "Anonymous Student"
+                      : project.profile?.full_name ||
+                        project.profile?.username ||
+                        "Student"}
                   </AppText>
                 </View>
                 <View className="flex-row items-center gap-4">

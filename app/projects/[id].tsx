@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,9 +14,12 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
+import { useSupabase } from "../../providers/SupabaseProvider";
 
 type ProjectDetail = {
   id: string;
+  user_id: string | null;
+  is_anonymous: boolean;
   title: string;
   summary: string | null;
   details: string | null;
@@ -25,6 +29,12 @@ type ProjectDetail = {
   cover_url: string | null;
   repo_url: string | null;
   created_at: string;
+};
+
+type ProjectAuthor = {
+  full_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
 };
 
 const fallbackCover =
@@ -46,11 +56,19 @@ const formatTimeAgo = (dateString: string) => {
 
 export default function ProjectDetailsScreen() {
   const { statusBarStyle } = useTheme();
+  const { session } = useSupabase();
   const router = useRouter();
+  const scheme = useColorScheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [author, setAuthor] = useState<ProjectAuthor | null>(null);
+  const [isLiked, setIsLiked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const iconColors = {
+    muted: scheme === "dark" ? "#94A3B8" : "#64748B",
+    danger: scheme === "dark" ? "#F87171" : "#DC2626",
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -64,7 +82,7 @@ export default function ProjectDetailsScreen() {
       const { data, error } = await supabase
         .from("projects")
         .select(
-          "id, title, summary, details, tags, views, likes, cover_url, repo_url, created_at",
+          "id, user_id, is_anonymous, title, summary, details, tags, views, likes, cover_url, repo_url, created_at",
         )
         .eq("id", id)
         .maybeSingle();
@@ -75,7 +93,34 @@ export default function ProjectDetailsScreen() {
         setErrorMessage(error.message);
         setProject(null);
       } else {
-        setProject((data as ProjectDetail) ?? null);
+        const detail = (data as ProjectDetail) ?? null;
+        setProject(detail);
+        if (detail && !detail.is_anonymous && detail.user_id) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("full_name, username, avatar_url")
+            .eq("user_id", detail.user_id)
+            .maybeSingle();
+          if (isMounted) {
+            setAuthor((profileData as ProjectAuthor) ?? null);
+          }
+        } else {
+          setAuthor(null);
+        }
+
+        if (detail && session?.user?.id) {
+          const { data: likeData } = await supabase
+            .from("project_likes")
+            .select("project_id")
+            .eq("project_id", detail.id)
+            .eq("user_id", session.user.id)
+            .maybeSingle();
+          if (isMounted) {
+            setIsLiked(Boolean(likeData));
+          }
+        } else if (isMounted) {
+          setIsLiked(false);
+        }
       }
 
       setIsLoading(false);
@@ -83,10 +128,60 @@ export default function ProjectDetailsScreen() {
 
     loadProject();
 
+    const incrementViews = async () => {
+      if (!id) return;
+      const { data: viewsData, error: viewsError } = await supabase.rpc(
+        "increment_project_views",
+        { p_project_id: id },
+      );
+      if (!viewsError && isMounted && typeof viewsData === "number") {
+        setProject((prev) => (prev ? { ...prev, views: viewsData } : prev));
+      }
+    };
+
+    incrementViews();
+
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, session?.user?.id]);
+
+  const handleToggleLike = async () => {
+    if (!session?.user?.id || !project) {
+      setErrorMessage("Please log in to like projects.");
+      return;
+    }
+
+    const previousLiked = isLiked;
+    const previousLikes = project.likes;
+    const nextLiked = !isLiked;
+
+    setIsLiked(nextLiked);
+    setProject((prev) =>
+      prev
+        ? {
+            ...prev,
+            likes: Math.max(prev.likes + (nextLiked ? 1 : -1), 0),
+          }
+        : prev,
+    );
+
+    const { data, error } = await supabase.rpc("set_project_like", {
+      p_project_id: project.id,
+      p_is_liked: nextLiked,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setIsLiked(previousLiked);
+      setProject((prev) => (prev ? { ...prev, likes: previousLikes } : prev));
+      return;
+    }
+
+    if (typeof data === "number") {
+      setProject((prev) => (prev ? { ...prev, likes: data } : prev));
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
@@ -144,19 +239,59 @@ export default function ProjectDetailsScreen() {
             </AppText>
 
             <View className="mt-4 flex-row items-center">
-              <View className="h-10 w-10 items-center justify-center rounded-full bg-amber-200 dark:bg-amber-700">
-                <AppText className="text-xs font-semibold text-amber-900 dark:text-amber-50">
-                  ST
-                </AppText>
+              <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-amber-200 dark:bg-amber-700">
+                <Image
+                  source={{
+                    uri: project?.is_anonymous
+                      ? "https://placehold.co/40x40/png"
+                      : (author?.avatar_url ??
+                        "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=80&q=80"),
+                  }}
+                  className="h-full w-full"
+                  resizeMode="cover"
+                />
               </View>
               <View className="ml-3">
                 <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  Student
+                  {project?.is_anonymous
+                    ? "Anonymous Student"
+                    : author?.full_name || author?.username || "Student"}
                 </AppText>
+                {!project?.is_anonymous && author?.username ? (
+                  <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                    @{author.username}
+                  </AppText>
+                ) : null}
                 <AppText className="text-xs text-slate-500 dark:text-slate-400">
                   {project?.created_at ? formatTimeAgo(project.created_at) : ""}
                 </AppText>
               </View>
+            </View>
+
+            <View className="mt-4 flex-row items-center gap-6">
+              <View className="flex-row items-center gap-2">
+                <Ionicons
+                  name="eye-outline"
+                  size={18}
+                  color={iconColors.muted}
+                />
+                <AppText className="text-sm text-slate-500 dark:text-slate-400">
+                  {project?.views ?? 0}
+                </AppText>
+              </View>
+              <Pressable
+                onPress={handleToggleLike}
+                className="flex-row items-center gap-2"
+              >
+                <Ionicons
+                  name={isLiked ? "heart" : "heart-outline"}
+                  size={18}
+                  color={isLiked ? iconColors.danger : iconColors.muted}
+                />
+                <AppText className="text-sm text-slate-500 dark:text-slate-400">
+                  {project?.likes ?? 0}
+                </AppText>
+              </Pressable>
             </View>
 
             {errorMessage ? (
