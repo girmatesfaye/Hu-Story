@@ -1,4 +1,10 @@
-import { ScrollView, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  ScrollView,
+  Switch,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -17,6 +23,7 @@ export default function CreateProjectsScreen() {
   const [summary, setSummary] = useState("");
   const [tagsText, setTagsText] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -41,6 +48,7 @@ export default function CreateProjectsScreen() {
 
     const { error } = await supabase.from("projects").insert({
       user_id: session.user.id,
+      is_anonymous: isAnonymous,
       title: title.trim(),
       summary: summary.trim() || null,
       details: null,
@@ -170,6 +178,32 @@ export default function CreateProjectsScreen() {
                 onChangeText={setRepoUrl}
               />
             </View>
+          </View>
+
+          <View className="mt-6 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <View className="flex-row items-center">
+              <Ionicons
+                name={isAnonymous ? "lock-closed" : "person-circle"}
+                size={18}
+                color={isAnonymous ? "#16A34A" : colors.mutedText}
+              />
+              <View className="ml-2">
+                <AppText className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Publish anonymously
+                </AppText>
+                <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                  {isAnonymous
+                    ? "Your name and photo are hidden."
+                    : "Your name and photo will be shown."}
+                </AppText>
+              </View>
+            </View>
+            <Switch
+              value={isAnonymous}
+              onValueChange={setIsAnonymous}
+              trackColor={{ false: "#CBD5F5", true: "#16A34A" }}
+              thumbColor="#FFFFFF"
+            />
           </View>
 
           <View className="mt-6">

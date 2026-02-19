@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  Image,
   ScrollView,
   View,
   Pressable,
@@ -17,11 +18,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type RantDetail = {
   id: string;
+  user_id: string | null;
   content: string;
   created_at: string;
   category: string | null;
   views: number;
   comment_count: number;
+  is_anonymous: boolean;
+};
+
+type RantAuthor = {
+  full_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
 };
 
 type RantComment = {
@@ -51,6 +60,7 @@ export default function RantCommentsScreen() {
   const router = useRouter();
   const { session } = useSupabase();
   const [rant, setRant] = useState<RantDetail | null>(null);
+  const [author, setAuthor] = useState<RantAuthor | null>(null);
   const [comments, setComments] = useState<RantComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -64,6 +74,9 @@ export default function RantCommentsScreen() {
     placeholder: scheme === "dark" ? "#94A3B8" : "#64748B",
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
+
+  const fallbackAvatar =
+    "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=80&q=80";
 
   useEffect(() => {
     let isMounted = true;
@@ -93,7 +106,9 @@ export default function RantCommentsScreen() {
 
       const { data: rantData, error: rantError } = await supabase
         .from("rants")
-        .select("id, content, created_at, category, views, comment_count")
+        .select(
+          "id, user_id, content, created_at, category, views, comment_count, is_anonymous",
+        )
         .eq("id", id)
         .maybeSingle();
 
@@ -113,9 +128,23 @@ export default function RantCommentsScreen() {
       }
 
       if (isMounted) {
-        setRant((rantData as RantDetail) ?? null);
+        const detail = (rantData as RantDetail) ?? null;
+        setRant(detail);
         setComments((commentData ?? []) as RantComment[]);
         setIsLoading(false);
+
+        if (detail && !detail.is_anonymous && detail.user_id) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("full_name, username, avatar_url")
+            .eq("user_id", detail.user_id)
+            .maybeSingle();
+          if (isMounted) {
+            setAuthor((profileData as RantAuthor) ?? null);
+          }
+        } else {
+          setAuthor(null);
+        }
       }
 
       if (cacheKey && !rantError && !commentError) {
@@ -135,6 +164,18 @@ export default function RantCommentsScreen() {
 
     loadCached();
     loadRant();
+
+    const incrementViews = async () => {
+      if (!id) return;
+      const { data, error } = await supabase.rpc("increment_rant_views", {
+        p_rant_id: id,
+      });
+      if (!error && isMounted && typeof data === "number") {
+        setRant((prev) => (prev ? { ...prev, views: data } : prev));
+      }
+    };
+
+    incrementViews();
 
     return () => {
       isMounted = false;
@@ -271,6 +312,34 @@ export default function RantCommentsScreen() {
             <AppText className="text-sm font-semibold mb-2.5 text-slate-900 dark:text-slate-100">
               Rant #{id ?? "-"}
             </AppText>
+
+            {rant ? (
+              <View className="mb-3 flex-row items-center">
+                <View className="h-9 w-9 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                  <Image
+                    source={{
+                      uri: rant.is_anonymous
+                        ? "https://placehold.co/40x40/png"
+                        : (author?.avatar_url ?? fallbackAvatar),
+                    }}
+                    className="h-full w-full"
+                    resizeMode="cover"
+                  />
+                </View>
+                <View className="ml-2">
+                  <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {rant.is_anonymous
+                      ? "Anonymous Student"
+                      : author?.full_name || author?.username || "Student"}
+                  </AppText>
+                  {!rant.is_anonymous && author?.username ? (
+                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                      @{author.username}
+                    </AppText>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
 
             <AppText className="text-[15px] leading-[22px] text-slate-900 dark:text-slate-100">
               {isLoading

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, ScrollView, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Switch, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "../../components/AppText";
@@ -14,6 +14,7 @@ export default function CreateRantScreen() {
   const { session } = useSupabase();
   const [activeCategory, setActiveCategory] = useState(categories[0]);
   const [text, setText] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -35,7 +36,7 @@ export default function CreateRantScreen() {
       user_id: session.user.id,
       category: activeCategory,
       content: text.trim(),
-      is_anonymous: true,
+      is_anonymous: isAnonymous,
     });
 
     setIsSubmitting(false);
@@ -101,9 +102,9 @@ export default function CreateRantScreen() {
             value={text}
             onChangeText={setText}
             placeholder="Spill the tea... (respectfully). What's happening on campus today?"
-            placeholderTextColor="#CBD5F5"
+            placeholderTextColor="#979eb4"
             multiline
-            className="min-h-[240px] text-base leading-6 text-slate-900 dark:text-slate-100"
+            className=" text-base leading-6 text-slate-900 dark:text-slate-100"
           />
           <View className="mt-2 h-[1px] bg-slate-200 dark:bg-slate-800" />
           <View className="flex-row items-center justify-end mt-2">
@@ -113,11 +114,30 @@ export default function CreateRantScreen() {
           </View>
         </View>
 
-        <View className="flex-row items-center mt-6">
-          <Ionicons name="lock-closed" size={18} color="#16A34A" />
-          <AppText className="ml-2 text-sm text-slate-600 dark:text-slate-300">
-            Your rant is 100% anonymous & untraceable.
-          </AppText>
+        <View className="mt-6 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <View className="flex-row items-center">
+            <Ionicons
+              name={isAnonymous ? "lock-closed" : "person-circle"}
+              size={18}
+              color={isAnonymous ? "#16A34A" : "#64748B"}
+            />
+            <View className="ml-2">
+              <AppText className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Post anonymously
+              </AppText>
+              <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                {isAnonymous
+                  ? "Your name and photo are hidden."
+                  : "Your name and photo will be shown."}
+              </AppText>
+            </View>
+          </View>
+          <Switch
+            value={isAnonymous}
+            onValueChange={setIsAnonymous}
+            trackColor={{ false: "#CBD5F5", true: "#16A34A" }}
+            thumbColor="#FFFFFF"
+          />
         </View>
 
         {errorMessage ? (
@@ -146,4 +166,3 @@ export default function CreateRantScreen() {
     </SafeAreaView>
   );
 }
-

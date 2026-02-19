@@ -57,6 +57,155 @@ create trigger rants_set_updated_at
 before update on public.rants
 for each row execute procedure public.set_updated_at();
 
+-- Rant votes
+create table if not exists public.rant_votes (
+  rant_id uuid not null references public.rants(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  vote smallint not null check (vote in (-1, 1)),
+  created_at timestamptz not null default now(),
+  primary key (rant_id, user_id)
+);
+
+create index if not exists rant_votes_rant_id_idx on public.rant_votes(rant_id);
+create index if not exists rant_votes_user_id_idx on public.rant_votes(user_id);
+
+create or replace function public.set_rant_vote(p_rant_id uuid, p_vote int)
+returns table (upvotes int, downvotes int, user_vote int)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_existing int;
+begin
+  if auth.uid() is null then
+    raise exception 'unauthenticated';
+  end if;
+
+  if p_vote not in (-1, 0, 1) then
+    raise exception 'invalid vote';
+  end if;
+
+  select vote into v_existing
+  from public.rant_votes
+  where rant_id = p_rant_id
+    and user_id = auth.uid();
+
+  if p_vote = 0 then
+    if v_existing is not null then
+      delete from public.rant_votes
+      where rant_id = p_rant_id
+        and user_id = auth.uid();
+
+      if v_existing = 1 then
+        update public.rants r
+        set upvotes = greatest(r.upvotes - 1, 0)
+        where r.id = p_rant_id;
+      else
+        update public.rants r
+        set downvotes = greatest(r.downvotes - 1, 0)
+        where r.id = p_rant_id;
+      end if;
+    end if;
+  else
+    if v_existing is null then
+      insert into public.rant_votes (rant_id, user_id, vote)
+      values (p_rant_id, auth.uid(), p_vote);
+
+      if p_vote = 1 then
+        update public.rants r
+        set upvotes = r.upvotes + 1
+        where r.id = p_rant_id;
+      else
+        update public.rants r
+        set downvotes = r.downvotes + 1
+        where r.id = p_rant_id;
+      end if;
+    elsif v_existing <> p_vote then
+      update public.rant_votes
+      set vote = p_vote
+      where rant_id = p_rant_id
+        and user_id = auth.uid();
+
+      if v_existing = 1 then
+        update public.rants r
+        set upvotes = greatest(r.upvotes - 1, 0),
+            downvotes = r.downvotes + 1
+        where r.id = p_rant_id;
+      else
+        update public.rants r
+        set downvotes = greatest(r.downvotes - 1, 0),
+            upvotes = r.upvotes + 1
+        where r.id = p_rant_id;
+      end if;
+    end if;
+  end if;
+
+  return query
+  select r.upvotes,
+         r.downvotes,
+         coalesce(v.vote, 0) as user_vote
+  from public.rants r
+  left join public.rant_votes v
+    on v.rant_id = r.id
+   and v.user_id = auth.uid()
+  where r.id = p_rant_id;
+end;
+$$;
+
+-- Rant views
+create table if not exists public.rant_views (
+  rant_id uuid not null references public.rants(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (rant_id, user_id)
+);
+
+create index if not exists rant_views_rant_id_idx on public.rant_views(rant_id);
+create index if not exists rant_views_user_id_idx on public.rant_views(user_id);
+
+create or replace function public.increment_rant_views(p_rant_id uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_exists boolean;
+  v_views int;
+begin
+  if auth.uid() is null then
+    select views into v_views
+    from public.rants
+    where id = p_rant_id;
+    return coalesce(v_views, 0);
+  end if;
+
+  select exists (
+    select 1
+    from public.rant_views
+    where rant_id = p_rant_id
+      and user_id = auth.uid()
+  ) into v_exists;
+
+  if not v_exists then
+    insert into public.rant_views (rant_id, user_id)
+    values (p_rant_id, auth.uid());
+
+    update public.rants r
+    set views = r.views + 1
+    where r.id = p_rant_id
+    returning r.views into v_views;
+  else
+    select views into v_views
+    from public.rants
+    where id = p_rant_id;
+  end if;
+
+  return coalesce(v_views, 0);
+end;
+$$;
+
 -- Rant comments
 create table if not exists public.rant_comments (
   id uuid primary key default gen_random_uuid(),
@@ -226,6 +375,7 @@ for each row execute procedure public.set_updated_at();
 create table if not exists public.projects (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete set null,
+  is_anonymous boolean not null default true,
   title text not null,
   summary text,
   details text,
@@ -243,6 +393,118 @@ create index if not exists projects_created_at_idx on public.projects(created_at
 create trigger projects_set_updated_at
 before update on public.projects
 for each row execute procedure public.set_updated_at();
+
+-- Project likes
+create table if not exists public.project_likes (
+  project_id uuid not null references public.projects(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (project_id, user_id)
+);
+
+create index if not exists project_likes_project_id_idx on public.project_likes(project_id);
+create index if not exists project_likes_user_id_idx on public.project_likes(user_id);
+
+create or replace function public.set_project_like(p_project_id uuid, p_is_liked boolean)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_exists boolean;
+  v_likes int;
+begin
+  if auth.uid() is null then
+    raise exception 'unauthenticated';
+  end if;
+
+  select exists (
+    select 1
+    from public.project_likes
+    where project_id = p_project_id
+      and user_id = auth.uid()
+  ) into v_exists;
+
+  if p_is_liked and not v_exists then
+    insert into public.project_likes (project_id, user_id)
+    values (p_project_id, auth.uid());
+
+    update public.projects
+    set likes = likes + 1
+    where id = p_project_id
+    returning likes into v_likes;
+  elsif (not p_is_liked) and v_exists then
+    delete from public.project_likes
+    where project_id = p_project_id
+      and user_id = auth.uid();
+
+    update public.projects
+    set likes = greatest(likes - 1, 0)
+    where id = p_project_id
+    returning likes into v_likes;
+  else
+    select likes into v_likes
+    from public.projects
+    where id = p_project_id;
+  end if;
+
+  return coalesce(v_likes, 0);
+end;
+$$;
+
+-- Project views
+create table if not exists public.project_views (
+  project_id uuid not null references public.projects(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (project_id, user_id)
+);
+
+create index if not exists project_views_project_id_idx on public.project_views(project_id);
+create index if not exists project_views_user_id_idx on public.project_views(user_id);
+
+create or replace function public.increment_project_views(p_project_id uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_exists boolean;
+  v_views int;
+begin
+  if auth.uid() is null then
+    select views into v_views
+    from public.projects
+    where id = p_project_id;
+    return coalesce(v_views, 0);
+  end if;
+
+  select exists (
+    select 1
+    from public.project_views
+    where project_id = p_project_id
+      and user_id = auth.uid()
+  ) into v_exists;
+
+  if not v_exists then
+    insert into public.project_views (project_id, user_id)
+    values (p_project_id, auth.uid());
+
+    update public.projects p
+    set views = p.views + 1
+    where p.id = p_project_id
+    returning p.views into v_views;
+  else
+    select views into v_views
+    from public.projects
+    where id = p_project_id;
+  end if;
+
+  return coalesce(v_views, 0);
+end;
+$$;
 
 -- Notifications
 create table if not exists public.notifications (
