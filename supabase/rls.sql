@@ -10,6 +10,7 @@ alter table public.rant_comment_likes enable row level security;
 alter table public.events enable row level security;
 alter table public.event_attendees enable row level security;
 alter table public.spots enable row level security;
+alter table public.spot_images enable row level security;
 alter table public.spot_reviews enable row level security;
 alter table public.projects enable row level security;
 alter table public.project_likes enable row level security;
@@ -220,6 +221,28 @@ create policy "spots_admin_delete"
   on public.spots
   for delete
   using (public.is_admin());
+
+-- Spot images
+create policy "spot_images_public_read"
+  on public.spot_images
+  for select
+  using (true);
+
+create policy "spot_images_owner_insert"
+  on public.spot_images
+  for insert
+  with check (auth.uid() = user_id);
+
+create policy "spot_images_owner_update"
+  on public.spot_images
+  for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "spot_images_owner_delete"
+  on public.spot_images
+  for delete
+  using (auth.uid() = user_id);
 
 -- Spot reviews
 create policy "spot_reviews_public_read"
