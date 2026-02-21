@@ -39,6 +39,9 @@ type RantComment = {
   likes: number;
   created_at: string;
   user_id: string | null;
+  is_anonymous?: boolean;
+  parent_comment_id?: string | null;
+  is_liked?: boolean;
 };
 
 const formatTimeAgo = (dateString: string) => {
@@ -62,7 +65,13 @@ export default function RantCommentsScreen() {
   const [rant, setRant] = useState<RantDetail | null>(null);
   const [author, setAuthor] = useState<RantAuthor | null>(null);
   const [comments, setComments] = useState<RantComment[]>([]);
+  const [commentProfiles, setCommentProfiles] = useState<
+    Record<string, RantAuthor>
+  >({});
   const [commentText, setCommentText] = useState("");
+  const [isAnonymousComment, setIsAnonymousComment] = useState(false);
+  const [replyToId, setReplyToId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -77,6 +86,25 @@ export default function RantCommentsScreen() {
 
   const fallbackAvatar =
     "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=80&q=80";
+
+  const commentById = new Map(comments.map((comment) => [comment.id, comment]));
+  const depthCache = new Map<string, number>();
+
+  const getDepth = (commentId: string, visited = new Set<string>()): number => {
+    if (depthCache.has(commentId)) return depthCache.get(commentId) as number;
+    if (visited.has(commentId)) return 0;
+    visited.add(commentId);
+
+    const current = commentById.get(commentId);
+    if (!current?.parent_comment_id) {
+      depthCache.set(commentId, 0);
+      return 0;
+    }
+
+    const depth = 1 + getDepth(current.parent_comment_id, visited);
+    depthCache.set(commentId, depth);
+    return depth;
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -118,9 +146,10 @@ export default function RantCommentsScreen() {
 
       const { data: commentData, error: commentError } = await supabase
         .from("rant_comments")
-        .select("id, content, likes, created_at, user_id")
+        .select(
+          "id, content, likes, created_at, user_id, parent_comment_id, is_anonymous",
+        )
         .eq("rant_id", id)
-        .is("parent_comment_id", null)
         .order("created_at", { ascending: true });
 
       if (commentError && isMounted) {
@@ -130,7 +159,58 @@ export default function RantCommentsScreen() {
       if (isMounted) {
         const detail = (rantData as RantDetail) ?? null;
         setRant(detail);
-        setComments((commentData ?? []) as RantComment[]);
+        const rows = (commentData ?? []) as RantComment[];
+        let likeMap = new Map<string, boolean>();
+        const commentUserIds = Array.from(
+          new Set(
+            rows
+              .map((row) => row.user_id)
+              .filter((userId): userId is string => Boolean(userId)),
+          ),
+        );
+
+        if (commentUserIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, full_name, username, avatar_url")
+            .in("user_id", commentUserIds);
+
+          setCommentProfiles(
+            (profiles ?? []).reduce<Record<string, RantAuthor>>(
+              (acc, profile) => {
+                acc[profile.user_id] = {
+                  full_name: profile.full_name,
+                  username: profile.username,
+                  avatar_url: profile.avatar_url,
+                };
+                return acc;
+              },
+              {},
+            ),
+          );
+        } else {
+          setCommentProfiles({});
+        }
+
+        if (session?.user?.id && rows.length > 0) {
+          const commentIds = rows.map((row) => row.id);
+          const { data: likes } = await supabase
+            .from("rant_comment_likes")
+            .select("comment_id")
+            .in("comment_id", commentIds)
+            .eq("user_id", session.user.id);
+
+          likeMap = new Map(
+            (likes ?? []).map((like) => [like.comment_id, true]),
+          );
+        }
+
+        setComments(
+          rows.map((row) => ({
+            ...row,
+            is_liked: likeMap.get(row.id) ?? false,
+          })),
+        );
         setIsLoading(false);
 
         if (detail && !detail.is_anonymous && detail.user_id) {
@@ -180,7 +260,7 @@ export default function RantCommentsScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, session?.user?.id]);
 
   useEffect(() => {
     if (!id) return;
@@ -199,16 +279,43 @@ export default function RantCommentsScreen() {
           const eventType = payload.eventType;
 
           if (eventType === "INSERT") {
-            const newRow = payload.new as RantComment & {
-              parent_comment_id?: string | null;
-            };
-
-            if (newRow.parent_comment_id) return;
+            const newRow = payload.new as RantComment;
 
             setComments((prev) => {
               if (prev.some((comment) => comment.id === newRow.id)) return prev;
-              return [...prev, newRow];
+              return [...prev, { ...newRow, is_liked: false }];
             });
+
+            if (newRow.user_id) {
+              setCommentProfiles((prev) => {
+                if (newRow.user_id && prev[newRow.user_id]) return prev;
+                return prev;
+              });
+
+              void supabase
+                .from("profiles")
+                .select("user_id, full_name, username, avatar_url")
+                .eq("user_id", newRow.user_id)
+                .maybeSingle()
+                .then(({ data }) => {
+                  if (!data?.user_id) return;
+                  setCommentProfiles((prev) => ({
+                    ...prev,
+                    [data.user_id]: {
+                      full_name: data.full_name,
+                      username: data.username,
+                      avatar_url: data.avatar_url,
+                    },
+                  }));
+                });
+            }
+
+            if (newRow.parent_comment_id) {
+              setExpandedIds((prev) => ({
+                ...prev,
+                [newRow.parent_comment_id as string]: true,
+              }));
+            }
             setRant((prev) =>
               prev
                 ? {
@@ -223,7 +330,9 @@ export default function RantCommentsScreen() {
             const updatedRow = payload.new as RantComment;
             setComments((prev) =>
               prev.map((comment) =>
-                comment.id === updatedRow.id ? updatedRow : comment,
+                comment.id === updatedRow.id
+                  ? { ...updatedRow, is_liked: comment.is_liked }
+                  : comment,
               ),
             );
           }
@@ -264,16 +373,12 @@ export default function RantCommentsScreen() {
     setIsSending(true);
     setErrorMessage(null);
 
-    const { data, error } = await supabase
-      .from("rant_comments")
-      .insert({
-        rant_id: id,
-        user_id: session.user.id,
-        content: commentText.trim(),
-        parent_comment_id: null,
-      })
-      .select("id, content, likes, created_at, user_id")
-      .single();
+    const { data, error } = await supabase.rpc("add_rant_comment", {
+      p_rant_id: id,
+      p_parent_id: replyToId,
+      p_content: commentText.trim(),
+      p_is_anonymous: isAnonymousComment,
+    });
 
     setIsSending(false);
 
@@ -282,10 +387,215 @@ export default function RantCommentsScreen() {
       return;
     }
 
-    setComments((prev) => [...prev, data as RantComment]);
+    if (data) {
+      setComments((prev) => [
+        ...prev,
+        { ...(data as RantComment), is_liked: false },
+      ]);
+    }
     setCommentText("");
+    if (replyToId) {
+      setExpandedIds((prev) => ({
+        ...prev,
+        [replyToId]: true,
+      }));
+    }
+    setReplyToId(null);
+    setIsAnonymousComment(false);
     setRant((prev) =>
       prev ? { ...prev, comment_count: (prev.comment_count ?? 0) + 1 } : prev,
+    );
+  };
+
+  const handleToggleLike = async (commentId: string) => {
+    if (!session?.user?.id) {
+      setErrorMessage("Please log in to like comments.");
+      return;
+    }
+
+    let previousLiked = false;
+    let previousLikes = 0;
+    let nextLiked = false;
+
+    setComments((prev) =>
+      prev.map((comment) => {
+        if (comment.id !== commentId) return comment;
+        previousLiked = comment.is_liked ?? false;
+        previousLikes = comment.likes;
+        nextLiked = !previousLiked;
+
+        return {
+          ...comment,
+          is_liked: nextLiked,
+          likes: Math.max(comment.likes + (nextLiked ? 1 : -1), 0),
+        };
+      }),
+    );
+
+    const { data, error } = await supabase.rpc("set_rant_comment_like", {
+      p_comment_id: commentId,
+      p_is_liked: nextLiked,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setComments((prev) =>
+        prev.map((comment) =>
+          comment.id === commentId
+            ? {
+                ...comment,
+                is_liked: previousLiked,
+                likes: previousLikes,
+              }
+            : comment,
+        ),
+      );
+      return;
+    }
+
+    if (typeof data === "number") {
+      setComments((prev) =>
+        prev.map((comment) =>
+          comment.id === commentId ? { ...comment, likes: data } : comment,
+        ),
+      );
+    }
+  };
+
+  const toggleReplies = (commentId: string) => {
+    setExpandedIds((prev) => ({
+      ...prev,
+      [commentId]: !prev[commentId],
+    }));
+  };
+
+  const startReply = (commentId: string) => {
+    setReplyToId((prev) => (prev === commentId ? null : commentId));
+    setExpandedIds((prev) => ({
+      ...prev,
+      [commentId]: true,
+    }));
+  };
+
+  const rootComments = comments.filter((comment) => !comment.parent_comment_id);
+  const replyMap = comments.reduce<Record<string, RantComment[]>>(
+    (acc, comment) => {
+      if (comment.parent_comment_id) {
+        if (!acc[comment.parent_comment_id]) {
+          acc[comment.parent_comment_id] = [];
+        }
+        acc[comment.parent_comment_id].push(comment);
+      }
+      return acc;
+    },
+    {},
+  );
+
+  const renderComment = (comment: RantComment, depth: number) => {
+    const replies = replyMap[comment.id] ?? [];
+    const isExpanded = expandedIds[comment.id] ?? false;
+    const commentProfile = comment.user_id
+      ? commentProfiles[comment.user_id]
+      : null;
+    const isAnonymous = Boolean(comment.is_anonymous);
+    const displayName = isAnonymous
+      ? "Anonymous"
+      : comment.user_id
+        ? commentProfile?.full_name || commentProfile?.username || "Student"
+        : "Anonymous";
+    const avatarUrl = isAnonymous
+      ? null
+      : comment.user_id
+        ? commentProfile?.avatar_url
+        : null;
+
+    const replyIndent = 16;
+    return (
+      <View
+        key={comment.id}
+        style={{ marginLeft: comment.parent_comment_id ? replyIndent : 0 }}
+      >
+        <View>
+          <View className="py-3.5 border-b border-slate-200 dark:border-slate-800">
+            <View className="flex-row items-center mb-2">
+              {avatarUrl ? (
+                <View className="w-9 h-9 rounded-full overflow-hidden mr-2.5 bg-slate-100 dark:bg-slate-900">
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : (
+                <View className="w-9 h-9 rounded-full items-center justify-center mr-2.5 bg-slate-100 dark:bg-slate-900">
+                  <AppText className="text-xs font-semibold text-green-600 dark:text-green-400">
+                    {comment.user_id ? "ST" : "AN"}
+                  </AppText>
+                </View>
+              )}
+
+              <View className="flex-1">
+                <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {displayName}
+                </AppText>
+                {!isAnonymous && comment.user_id && commentProfile?.username ? (
+                  <AppText className="text-[11px] text-slate-500 dark:text-slate-400">
+                    @{commentProfile.username}
+                  </AppText>
+                ) : null}
+                <AppText className="text-[11px] mt-0.5 text-slate-500 dark:text-slate-400">
+                  {formatTimeAgo(comment.created_at)}
+                </AppText>
+              </View>
+            </View>
+
+            {comment.parent_comment_id ? (
+              <AppText className="text-[11px] mb-1 text-slate-500 dark:text-slate-400">
+                Replying to a comment
+              </AppText>
+            ) : null}
+            <AppText className="text-sm leading-5 text-slate-900 dark:text-slate-100">
+              {comment.content}
+            </AppText>
+
+            <View className="flex-row items-center gap-3 mt-2.5">
+              <Pressable
+                onPress={() => handleToggleLike(comment.id)}
+                className="flex-row items-center gap-1"
+              >
+                <Ionicons
+                  name={comment.is_liked ? "heart" : "heart-outline"}
+                  size={16}
+                  color={comment.is_liked ? "#DC2626" : iconColors.muted}
+                />
+                <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                  {comment.likes}
+                </AppText>
+              </Pressable>
+
+              <Pressable onPress={() => startReply(comment.id)}>
+                <AppText className="text-xs text-green-600 dark:text-green-400">
+                  {replyToId === comment.id ? "Cancel" : "Reply"}
+                </AppText>
+              </Pressable>
+
+              {replies.length > 0 ? (
+                <Pressable onPress={() => toggleReplies(comment.id)}>
+                  <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                    {isExpanded
+                      ? "Hide replies"
+                      : `View replies (${replies.length})`}
+                  </AppText>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+
+          {isExpanded
+            ? replies.map((reply) => renderComment(reply, depth + 1))
+            : null}
+        </View>
+      </View>
     );
   };
 
@@ -307,6 +617,19 @@ export default function RantCommentsScreen() {
             </AppText>
             <View className="w-14" />
           </View>
+          {/* <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+            <Pressable
+              onPress={() => router.back()}
+              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+            >
+              <Feather name="arrow-left" size={24} color="black" />
+            </Pressable>
+
+            <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Comments
+            </AppText>
+            <View className="w-14" />
+          </View> */}
           {/* Rant Card */}
           <View className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4">
             <AppText className="text-sm font-semibold mb-2.5 text-slate-900 dark:text-slate-100">
@@ -375,61 +698,43 @@ export default function RantCommentsScreen() {
           ) : null}
 
           {/* Comments */}
-          {comments.map((comment) => (
-            <View
-              key={comment.id}
-              className="py-3.5 border-b border-slate-200 dark:border-slate-800"
-            >
-              {/* Header */}
-              <View className="flex-row items-center mb-2">
-                <View className="w-9 h-9 rounded-full items-center justify-center mr-2.5 bg-slate-100 dark:bg-slate-900">
-                  <AppText className="text-xs font-semibold text-green-600 dark:text-green-400">
-                    {comment.user_id ? "ST" : "AN"}
-                  </AppText>
-                </View>
-
-                <View className="flex-1">
-                  <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {comment.user_id ? "Student" : "Anonymous"}
-                  </AppText>
-                  <AppText className="text-[11px] mt-0.5 text-slate-500 dark:text-slate-400">
-                    {formatTimeAgo(comment.created_at)}
-                  </AppText>
-                </View>
-              </View>
-
-              {/* Body */}
-              <AppText className="text-sm leading-5 text-slate-900 dark:text-slate-100">
-                {comment.content}
-              </AppText>
-
-              {/* Actions */}
-              <View className="flex-row items-center gap-2 mt-2.5">
-                <Ionicons
-                  name="heart-outline"
-                  size={16}
-                  color={iconColors.muted}
-                />
-                <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                  {comment.likes}
-                </AppText>
-                <AppText className="text-xs ml-2 text-green-600 dark:text-green-400">
-                  Reply
-                </AppText>
-              </View>
-            </View>
-          ))}
+          {rootComments.map((comment) => renderComment(comment, 0))}
         </ScrollView>
 
         {/* Input Bar */}
         <View className="absolute bottom-0 left-0 right-0 flex-row items-center px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          {replyToId ? (
+            <View className="absolute -top-7 left-4 right-4 flex-row items-center justify-between rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-900">
+              <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                Replying to a comment
+              </AppText>
+              <Pressable onPress={() => setReplyToId(null)}>
+                <AppText className="text-xs text-green-600 dark:text-green-400">
+                  Cancel
+                </AppText>
+              </Pressable>
+            </View>
+          ) : null}
           <TextInput
-            placeholder="Join the discussion..."
+            placeholder={
+              replyToId ? "Write a reply..." : "Join the discussion..."
+            }
             placeholderTextColor={iconColors.placeholder}
             className="flex-1 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-full px-4 py-2 mr-2"
             value={commentText}
             onChangeText={setCommentText}
           />
+
+          <Pressable
+            onPress={() => setIsAnonymousComment((prev) => !prev)}
+            className="w-10 h-10 rounded-full items-center justify-center bg-slate-100 dark:bg-slate-900 mr-2"
+          >
+            <Ionicons
+              name={isAnonymousComment ? "lock-closed" : "person-circle"}
+              size={18}
+              color={isAnonymousComment ? iconColors.accent : iconColors.muted}
+            />
+          </Pressable>
 
           <Pressable
             onPress={handleSend}

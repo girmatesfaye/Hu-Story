@@ -8,6 +8,7 @@ import { useTheme } from "../../hooks/useTheme";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import * as ImagePicker from "expo-image-picker";
 
 export default function CreateEventScreen() {
   const router = useRouter();
@@ -24,6 +25,9 @@ export default function CreateEventScreen() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [tagsText, setTagsText] = useState("");
+  const [coverImageUri, setCoverImageUri] = useState<string | null>(null);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -48,6 +52,54 @@ export default function CreateEventScreen() {
     )}`;
 
     return `${dateTrimmed}T${timePart}${offset}`;
+  };
+
+  const handlePickCover = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      setErrorMessage("Permission needed to select a cover image.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      aspect: [16, 9],
+    });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setCoverImageUri(result.assets[0].uri);
+    }
+  };
+
+  const uploadCoverImage = async () => {
+    if (!coverImageUri || !session?.user) return null;
+
+    setIsUploadingCover(true);
+    try {
+      const response = await fetch(coverImageUri);
+      const blob = await response.blob();
+      const fileExt = coverImageUri.split(".").pop()?.split("?")[0] || "jpg";
+      const filePath = `events/${session.user.id}/${Date.now()}.${fileExt}`;
+      const contentType = blob.type || `image/${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatar")
+        .upload(filePath, blob, { contentType, upsert: false });
+
+      if (uploadError) {
+        setErrorMessage(uploadError.message);
+        return null;
+      }
+
+      const { data } = supabase.storage.from("avatar").getPublicUrl(filePath);
+      const publicUrl = data.publicUrl;
+      setCoverImageUrl(publicUrl);
+      return publicUrl;
+    } finally {
+      setIsUploadingCover(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -83,6 +135,8 @@ export default function CreateEventScreen() {
     setIsSubmitting(true);
     setErrorMessage(null);
 
+    const coverUrl = await uploadCoverImage();
+
     const { error } = await supabase.from("events").insert({
       user_id: session.user.id,
       title: title.trim(),
@@ -97,6 +151,7 @@ export default function CreateEventScreen() {
       host_name: hostName.trim() || null,
       fee_type: feeType,
       fee_amount: feeType === "paid" ? parsedFee : null,
+      cover_url: coverUrl,
     });
 
     setIsSubmitting(false);
@@ -127,17 +182,30 @@ export default function CreateEventScreen() {
           <View className="w-14" />
         </View>
         <ScrollView contentContainerClassName="px-5 pb-28 pt-5">
-          <Pressable className="h-40 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
-            <View className="h-12 w-12 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800">
-              <Ionicons
-                name="image-outline"
-                size={22}
-                color={colors.mutedText}
+          <Pressable
+            onPress={handlePickCover}
+            className="h-40 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+          >
+            {coverImageUri || coverImageUrl ? (
+              <Image
+                source={{ uri: coverImageUri ?? coverImageUrl ?? undefined }}
+                className="h-full w-full"
+                resizeMode="cover"
               />
-            </View>
-            <AppText className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
-              Add Event Cover
-            </AppText>
+            ) : (
+              <View className="items-center">
+                <View className="h-12 w-12 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800">
+                  <Ionicons
+                    name="image-outline"
+                    size={22}
+                    color={colors.mutedText}
+                  />
+                </View>
+                <AppText className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                  {isUploadingCover ? "Uploading..." : "Add Event Cover"}
+                </AppText>
+              </View>
+            )}
           </Pressable>
 
           <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
@@ -405,4 +473,3 @@ export default function CreateEventScreen() {
     </SafeAreaView>
   );
 }
-
