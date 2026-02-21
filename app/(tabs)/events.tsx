@@ -44,22 +44,20 @@ const resolveEventCoverUrl = (coverUrl: string | null) => {
   return data.publicUrl;
 };
 
-const formatEventTime = (startAt: string | null, endAt: string | null) => {
-  if (!startAt) return "Time TBD";
+const formatEventDate = (startAt: string | null, endAt: string | null) => {
+  if (!startAt) return "Date TBD";
   const startDate = new Date(startAt);
-  if (Number.isNaN(startDate.getTime())) return "Time TBD";
+  if (Number.isNaN(startDate.getTime())) return "Date TBD";
   const startLabel = startDate.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
   });
   if (!endAt) return startLabel;
   const endDate = new Date(endAt);
   if (Number.isNaN(endDate.getTime())) return startLabel;
   const endLabel = endDate.toLocaleString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
+    month: "short",
+    day: "numeric",
   });
   return `${startLabel} - ${endLabel}`;
 };
@@ -413,7 +411,7 @@ export default function EventTabScreen() {
             <EventCard
               key={event.id}
               title={event.title}
-              time={formatEventTime(event.start_at, event.end_at)}
+              time={formatEventDate(event.start_at, event.end_at)}
               location={event.location ?? "Location TBD"}
               price={
                 event.fee_type?.toLowerCase() === "paid"
@@ -441,7 +439,7 @@ export default function EventTabScreen() {
             <EventCard
               key={event.id}
               title={event.title}
-              time={formatEventTime(event.start_at, event.end_at)}
+              time={formatEventDate(event.start_at, event.end_at)}
               location={event.location ?? "Location TBD"}
               price={
                 event.fee_type?.toLowerCase() === "paid"
