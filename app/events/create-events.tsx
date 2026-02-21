@@ -79,14 +79,15 @@ export default function CreateEventScreen() {
     setIsUploadingCover(true);
     try {
       const response = await fetch(coverImageUri);
-      const blob = await response.blob();
+      const arrayBuffer = await response.arrayBuffer();
+      const fileData = new Uint8Array(arrayBuffer);
       const fileExt = coverImageUri.split(".").pop()?.split("?")[0] || "jpg";
       const filePath = `events/${session.user.id}/${Date.now()}.${fileExt}`;
-      const contentType = blob.type || `image/${fileExt}`;
+      const contentType = `image/${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatar")
-        .upload(filePath, blob, { contentType, upsert: false });
+        .upload(filePath, fileData, { contentType, upsert: false });
 
       if (uploadError) {
         setErrorMessage(uploadError.message);

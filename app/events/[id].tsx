@@ -25,35 +25,22 @@ type EventDetail = {
 const fallbackEventImage =
   "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80";
 
-const formatEventTime = (startAt: string | null, endAt: string | null) => {
-  if (!startAt) return "Time TBD";
-  const startDate = new Date(startAt);
-  if (Number.isNaN(startDate.getTime())) return "Time TBD";
+const formatEventDateTime = (value: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
 
-  const startLabel = startDate.toLocaleString(undefined, {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-
-  if (!endAt) return startLabel;
-  const endDate = new Date(endAt);
-  if (Number.isNaN(endDate.getTime())) return startLabel;
-
-  const sameDay =
-    startDate.getFullYear() === endDate.getFullYear() &&
-    startDate.getMonth() === endDate.getMonth() &&
-    startDate.getDate() === endDate.getDate();
-
-  const endLabel = endDate.toLocaleString(undefined, {
-    ...(sameDay ? {} : { weekday: "long", month: "short", day: "numeric" }),
-    hour: "numeric",
-    minute: "2-digit",
-  });
-
-  return `${startLabel} - ${endLabel}`;
+  return {
+    date: date.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }),
+    time: date.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+  };
 };
 
 export default function EventDetailsScreen() {
@@ -295,12 +282,30 @@ export default function EventDetailsScreen() {
                   />
                 </View>
                 <View className="flex-1">
-                  <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {formatEventTime(
-                      event?.start_at ?? null,
-                      event?.end_at ?? null,
-                    )}
-                  </AppText>
+                  {(() => {
+                    const start = formatEventDateTime(event?.start_at ?? null);
+                    const end = formatEventDateTime(event?.end_at ?? null);
+                    if (!start) {
+                      return (
+                        <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          Time TBD
+                        </AppText>
+                      );
+                    }
+
+                    const dateRange = end
+                      ? `${start.date} - ${end.date}`
+                      : start.date;
+                    const timeRange = end
+                      ? `${start.time} - ${end.time}`
+                      : start.time;
+
+                    return (
+                      <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {dateRange} · {timeRange}
+                      </AppText>
+                    );
+                  })()}
                   <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     Add to calendar
                   </AppText>
