@@ -82,11 +82,11 @@ export default function CreateEventScreen() {
       const arrayBuffer = await response.arrayBuffer();
       const fileData = new Uint8Array(arrayBuffer);
       const fileExt = coverImageUri.split(".").pop()?.split("?")[0] || "jpg";
-      const filePath = `events/${session.user.id}/${Date.now()}.${fileExt}`;
+      const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
       const contentType = `image/${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("avatar")
+        .from("event-covers")
         .upload(filePath, fileData, { contentType, upsert: false });
 
       if (uploadError) {
@@ -94,7 +94,9 @@ export default function CreateEventScreen() {
         return null;
       }
 
-      const { data } = supabase.storage.from("avatar").getPublicUrl(filePath);
+      const { data } = supabase.storage
+        .from("event-covers")
+        .getPublicUrl(filePath);
       const publicUrl = data.publicUrl;
       setCoverImageUrl(publicUrl);
       return publicUrl;

@@ -25,6 +25,16 @@ type EventDetail = {
 const fallbackEventImage =
   "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80";
 
+const resolveEventCoverUrl = (coverUrl: string | null) => {
+  const normalized = coverUrl?.trim();
+  if (!normalized) return null;
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  const { data } = supabase.storage
+    .from("event-covers")
+    .getPublicUrl(normalized);
+  return data.publicUrl;
+};
+
 const formatEventDateTime = (value: string | null) => {
   if (!value) return null;
   const date = new Date(value);
@@ -226,7 +236,11 @@ export default function EventDetailsScreen() {
 
           <View className="relative">
             <Image
-              source={{ uri: event?.cover_url ?? fallbackEventImage }}
+              source={{
+                uri:
+                  resolveEventCoverUrl(event?.cover_url ?? null) ??
+                  fallbackEventImage,
+              }}
               className="h-[240px] w-full"
               resizeMode="cover"
             />
