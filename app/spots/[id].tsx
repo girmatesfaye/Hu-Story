@@ -49,9 +49,14 @@ export default function SpotDetailsScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { colors } = useTheme();
   const [spot, setSpot] = useState<SpotDetail | null>(null);
+  const [spotImages, setSpotImages] = useState<string[]>([]);
   const [reviews, setReviews] = useState<SpotReview[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const galleryImages = [spot?.cover_url, ...spotImages].filter(
+    (url): url is string => Boolean(url),
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -80,13 +85,28 @@ export default function SpotDetailsScreen() {
         .eq("spot_id", id)
         .order("created_at", { ascending: false });
 
+      const { data: imageData, error: imageError } = await supabase
+        .from("spot_images")
+        .select("image_url, position")
+        .eq("spot_id", id)
+        .order("position", { ascending: true });
+
       if (reviewError && isMounted) {
         setErrorMessage(reviewError.message);
+      }
+
+      if (imageError && isMounted) {
+        setErrorMessage(imageError.message);
       }
 
       if (isMounted) {
         setSpot((spotData as SpotDetail) ?? null);
         setReviews((reviewData ?? []) as SpotReview[]);
+        setSpotImages(
+          (imageData ?? [])
+            .map((item) => item.image_url)
+            .filter((url): url is string => Boolean(url)),
+        );
         setIsLoading(false);
       }
     };
@@ -122,11 +142,22 @@ export default function SpotDetailsScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerClassName="px-5 pt-4 gap-4"
           >
-            <Image
-              source={{ uri: spot?.cover_url ?? fallbackSpotImage }}
-              className="h-[220px] w-[280px] rounded-2xl"
-              resizeMode="cover"
-            />
+            {galleryImages.length > 0 ? (
+              galleryImages.map((imageUrl, index) => (
+                <Image
+                  key={`${imageUrl}-${index}`}
+                  source={{ uri: imageUrl }}
+                  className="h-[220px] w-[280px] rounded-2xl"
+                  resizeMode="cover"
+                />
+              ))
+            ) : (
+              <Image
+                source={{ uri: fallbackSpotImage }}
+                className="h-[220px] w-[280px] rounded-2xl"
+                resizeMode="cover"
+              />
+            )}
           </ScrollView>
 
           <View className="px-5 pt-4">

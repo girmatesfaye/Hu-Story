@@ -514,6 +514,22 @@ create trigger spots_set_updated_at
 before update on public.spots
 for each row execute procedure public.set_updated_at();
 
+-- Spot images
+create table if not exists public.spot_images (
+  id uuid primary key default gen_random_uuid(),
+  spot_id uuid not null references public.spots(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  image_url text not null,
+  position int,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists spot_images_spot_id_idx
+  on public.spot_images(spot_id);
+
+create index if not exists spot_images_created_at_idx
+  on public.spot_images(created_at desc);
+
 -- Spot reviews
 create table if not exists public.spot_reviews (
   id uuid primary key default gen_random_uuid(),
@@ -531,6 +547,61 @@ create index if not exists spot_reviews_created_at_idx on public.spot_reviews(cr
 create trigger spot_reviews_set_updated_at
 before update on public.spot_reviews
 for each row execute procedure public.set_updated_at();
+
+-- Keep spots.rating_avg and spots.review_count in sync with spot_reviews
+create or replace function public.update_spot_rating()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_spot_id uuid;
+begin
+  if tg_op = 'DELETE' then
+    v_spot_id := old.spot_id;
+  else
+    v_spot_id := new.spot_id;
+  end if;
+
+  update public.spots s
+  set rating_avg = coalesce(
+        (select avg(r.rating)::numeric(3,2)
+         from public.spot_reviews r
+         where r.spot_id = v_spot_id),
+        0
+      ),
+      review_count = (
+        select count(*)
+        from public.spot_reviews r
+        where r.spot_id = v_spot_id
+      )
+  where s.id = v_spot_id;
+
+  if tg_op = 'UPDATE' and old.spot_id <> new.spot_id then
+    update public.spots s
+    set rating_avg = coalesce(
+          (select avg(r.rating)::numeric(3,2)
+           from public.spot_reviews r
+           where r.spot_id = old.spot_id),
+          0
+        ),
+        review_count = (
+          select count(*)
+          from public.spot_reviews r
+          where r.spot_id = old.spot_id
+        )
+    where s.id = old.spot_id;
+  end if;
+
+  return null;
+end;
+$$;
+
+drop trigger if exists spot_reviews_update_rating on public.spot_reviews;
+create trigger spot_reviews_update_rating
+after insert or update or delete on public.spot_reviews
+for each row execute procedure public.update_spot_rating();
 
 -- Projects
 create table if not exists public.projects (

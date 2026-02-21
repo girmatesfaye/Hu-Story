@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Image,
   Pressable,
   ScrollView,
   TextInput,
@@ -14,6 +15,7 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import * as ImagePicker from "expo-image-picker";
 
 const categories = ["Cafe", "Library", "Hangout", "Study", "Food", "Other"];
 
@@ -33,8 +35,81 @@ export default function CreateSpotScreen() {
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
+  const [imageUris, setImageUris] = useState<string[]>([]);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handlePickImages = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      setErrorMessage("Permission needed to select images.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+    });
+
+    if (!result.canceled && result.assets?.length) {
+      const uris = result.assets
+        .map((asset) => asset.uri)
+        .filter((uri): uri is string => Boolean(uri));
+      if (uris.length > 0) {
+        setImageUris(uris);
+      }
+    }
+  };
+
+  const getImageContentType = (fileExt: string) => {
+    const normalized = fileExt.toLowerCase();
+    if (normalized === "jpg" || normalized === "jpeg") return "image/jpeg";
+    if (normalized === "png") return "image/png";
+    if (normalized === "webp") return "image/webp";
+    return `image/${normalized}`;
+  };
+
+  const uploadSpotImages = async (): Promise<string[] | null> => {
+    if (!session?.user || imageUris.length === 0) {
+      return [] as string[];
+    }
+
+    setIsUploadingImages(true);
+    try {
+      const uploadedUrls: string[] = [];
+
+      for (const [index, uri] of imageUris.entries()) {
+        const response = await fetch(uri);
+        const arrayBuffer = await response.arrayBuffer();
+        const fileData = new Uint8Array(arrayBuffer);
+        const fileExt = uri.split(".").pop()?.split("?")[0] || "jpg";
+        const filePath = `${session.user.id}/${Date.now()}-${index}.${fileExt}`;
+        const contentType = getImageContentType(fileExt);
+
+        const { error: uploadError } = await supabase.storage
+          .from("spot-images")
+          .upload(filePath, fileData, { contentType, upsert: false });
+
+        if (uploadError) {
+          setErrorMessage(uploadError.message);
+          return null;
+        }
+
+        const { data } = supabase.storage
+          .from("spot-images")
+          .getPublicUrl(filePath);
+        uploadedUrls.push(data.publicUrl);
+      }
+
+      return uploadedUrls;
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!session?.user) {
@@ -50,21 +125,50 @@ export default function CreateSpotScreen() {
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    const { error } = await supabase.from("spots").insert({
-      user_id: session.user.id,
-      name: name.trim(),
-      category: selectedCategory,
-      location: location.trim() || null,
-      description: description.trim() || null,
-      price_type: feeType,
-    });
-
-    setIsSubmitting(false);
-
-    if (error) {
-      setErrorMessage(error.message);
+    const uploadedUrls = await uploadSpotImages();
+    if (!uploadedUrls) {
+      setIsSubmitting(false);
       return;
     }
+    const coverUrl = uploadedUrls[0] ?? null;
+
+    const { data: spotRow, error: spotError } = await supabase
+      .from("spots")
+      .insert({
+        user_id: session.user.id,
+        name: name.trim(),
+        category: selectedCategory,
+        location: location.trim() || null,
+        description: description.trim() || null,
+        price_type: feeType,
+        cover_url: coverUrl,
+      })
+      .select("id")
+      .single();
+
+    if (spotError || !spotRow) {
+      setIsSubmitting(false);
+      setErrorMessage(spotError?.message ?? "Unable to create spot.");
+      return;
+    }
+
+    const extraUrls = uploadedUrls.slice(1);
+    if (extraUrls.length > 0) {
+      const rows = extraUrls.map((url, index) => ({
+        spot_id: spotRow.id,
+        user_id: session.user.id,
+        image_url: url,
+        position: index + 1,
+      }));
+      const { error: imagesError } = await supabase
+        .from("spot_images")
+        .insert(rows);
+      if (imagesError) {
+        setErrorMessage(imagesError.message);
+      }
+    }
+
+    setIsSubmitting(false);
 
     router.replace("/(tabs)/spots");
   };
@@ -90,16 +194,38 @@ export default function CreateSpotScreen() {
         </View>
 
         <ScrollView contentContainerClassName="px-5 pb-32 pt-5">
-          <Pressable className="h-40 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
-            <View className="h-12 w-12 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800">
-              <Ionicons name="camera" size={22} color={colors.mutedText} />
-            </View>
-            <AppText className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
-              Tap to upload image
-            </AppText>
-            <AppText className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-              JPG, PNG (Max 5MB)
-            </AppText>
+          <Pressable
+            onPress={handlePickImages}
+            className="h-40 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+          >
+            {imageUris.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName="px-3 gap-3"
+              >
+                {imageUris.map((uri) => (
+                  <Image
+                    key={uri}
+                    source={{ uri }}
+                    className="h-28 w-36 rounded-xl"
+                    resizeMode="cover"
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              <View className="items-center">
+                <View className="h-12 w-12 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800">
+                  <Ionicons name="camera" size={22} color={colors.mutedText} />
+                </View>
+                <AppText className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                  {isUploadingImages ? "Uploading..." : "Tap to upload images"}
+                </AppText>
+                <AppText className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                  JPG, PNG (Max 5MB)
+                </AppText>
+              </View>
+            )}
           </Pressable>
 
           <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
