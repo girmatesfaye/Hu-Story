@@ -29,18 +29,30 @@ const formatEventTime = (startAt: string | null, endAt: string | null) => {
   if (!startAt) return "Time TBD";
   const startDate = new Date(startAt);
   if (Number.isNaN(startDate.getTime())) return "Time TBD";
+
   const startLabel = startDate.toLocaleString(undefined, {
     weekday: "long",
+    month: "short",
+    day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
+
   if (!endAt) return startLabel;
   const endDate = new Date(endAt);
   if (Number.isNaN(endDate.getTime())) return startLabel;
+
+  const sameDay =
+    startDate.getFullYear() === endDate.getFullYear() &&
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getDate() === endDate.getDate();
+
   const endLabel = endDate.toLocaleString(undefined, {
+    ...(sameDay ? {} : { weekday: "long", month: "short", day: "numeric" }),
     hour: "numeric",
     minute: "2-digit",
   });
+
   return `${startLabel} - ${endLabel}`;
 };
 
@@ -381,4 +393,3 @@ export default function EventDetailsScreen() {
     </SafeAreaView>
   );
 }
-

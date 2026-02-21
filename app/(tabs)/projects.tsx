@@ -6,8 +6,10 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { Pressable } from "react-native";
 import { useColorScheme } from "react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { useSupabase } from "../../providers/SupabaseProvider";
+import { useFocusEffect } from "@react-navigation/native";
 
 type ProjectItem = {
   id: string;
@@ -20,6 +22,7 @@ type ProjectItem = {
   views: number;
   likes: number;
   cover_url: string | null;
+  is_liked?: boolean;
   profile?: {
     full_name: string | null;
     username: string | null;
@@ -49,6 +52,7 @@ const formatTimeAgo = (dateString: string) => {
 
 export default function ProjectsTabScreen() {
   const { statusBarStyle } = useTheme();
+  const { session } = useSupabase();
   const router = useRouter();
   const scheme = useColorScheme();
   const [projects, setProjects] = useState<ProjectItem[]>([]);
@@ -58,68 +62,144 @@ export default function ProjectsTabScreen() {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
     muted: scheme === "dark" ? "#94A3B8" : "#64748B",
     accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
+    danger: scheme === "dark" ? "#F87171" : "#DC2626",
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
 
-  useEffect(() => {
+  const loadProjects = useCallback(async () => {
     let isMounted = true;
+    setIsLoading(true);
+    setErrorMessage(null);
 
-    const loadProjects = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
+    const { data, error } = await supabase
+      .from("projects")
+      .select(
+        "id, user_id, is_anonymous, title, summary, tags, created_at, views, likes, cover_url",
+      )
+      .order("created_at", { ascending: false });
 
-      const { data, error } = await supabase
-        .from("projects")
-        .select(
-          "id, user_id, is_anonymous, title, summary, tags, created_at, views, likes, cover_url",
-        )
-        .order("created_at", { ascending: false });
+    if (!isMounted) return;
 
-      if (!isMounted) return;
+    if (error) {
+      setErrorMessage(error.message);
+      setProjects([]);
+    } else {
+      const rows = (data ?? []) as ProjectItem[];
+      const projectIds = rows.map((project) => project.id);
+      const userIds = Array.from(
+        new Set(
+          rows
+            .filter((project) => !project.is_anonymous && project.user_id)
+            .map((project) => project.user_id as string),
+        ),
+      );
 
-      if (error) {
-        setErrorMessage(error.message);
-        setProjects([]);
-      } else {
-        const rows = (data ?? []) as ProjectItem[];
-        const userIds = Array.from(
-          new Set(
-            rows
-              .filter((project) => !project.is_anonymous && project.user_id)
-              .map((project) => project.user_id as string),
-          ),
+      let profileMap = new Map<string, ProjectItem["profile"]>();
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, full_name, username, avatar_url")
+          .in("user_id", userIds);
+
+        profileMap = new Map(
+          (profiles ?? []).map((profile) => [profile.user_id, profile]),
         );
-
-        if (userIds.length === 0) {
-          setProjects(rows);
-        } else {
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("user_id, full_name, username, avatar_url")
-            .in("user_id", userIds);
-
-          const map = new Map(
-            (profiles ?? []).map((profile) => [profile.user_id, profile]),
-          );
-
-          setProjects(
-            rows.map((project) => ({
-              ...project,
-              profile: project.user_id ? map.get(project.user_id) : undefined,
-            })),
-          );
-        }
       }
 
-      setIsLoading(false);
-    };
+      let likeMap = new Map<string, boolean>();
+      if (session?.user?.id && projectIds.length > 0) {
+        const { data: likes } = await supabase
+          .from("project_likes")
+          .select("project_id")
+          .in("project_id", projectIds)
+          .eq("user_id", session.user.id);
 
-    loadProjects();
+        likeMap = new Map((likes ?? []).map((like) => [like.project_id, true]));
+      }
+
+      setProjects(
+        rows.map((project) => ({
+          ...project,
+          profile: project.user_id
+            ? profileMap.get(project.user_id)
+            : undefined,
+          is_liked: likeMap.get(project.id) ?? false,
+        })),
+      );
+    }
+
+    setIsLoading(false);
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadProjects();
+      return undefined;
+    }, [loadProjects]),
+  );
+
+  const handleToggleLike = async (projectId: string) => {
+    if (!session?.user?.id) {
+      setErrorMessage("Please log in to like projects.");
+      return;
+    }
+
+    let previousLiked = false;
+    let previousLikes = 0;
+    let nextLiked = false;
+
+    setProjects((prev) =>
+      prev.map((project) => {
+        if (project.id !== projectId) return project;
+        previousLiked = project.is_liked ?? false;
+        previousLikes = project.likes;
+        nextLiked = !previousLiked;
+
+        return {
+          ...project,
+          is_liked: nextLiked,
+          likes: Math.max(project.likes + (nextLiked ? 1 : -1), 0),
+        };
+      }),
+    );
+
+    const { data, error } = await supabase.rpc("set_project_like", {
+      p_project_id: projectId,
+      p_is_liked: nextLiked,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === projectId
+            ? {
+                ...project,
+                is_liked: previousLiked,
+                likes: previousLikes,
+              }
+            : project,
+        ),
+      );
+      return;
+    }
+
+    if (typeof data === "number") {
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === projectId ? { ...project, likes: data } : project,
+        ),
+      );
+    }
+  };
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -232,16 +312,25 @@ export default function ProjectsTabScreen() {
                       {project.views}
                     </AppText>
                   </View>
-                  <View className="flex-row items-center">
+                  <Pressable
+                    onPress={() => handleToggleLike(project.id)}
+                    className="flex-row items-center"
+                  >
                     <Ionicons
-                      name="heart-outline"
+                      name={project.is_liked ? "heart" : "heart-outline"}
                       size={18}
-                      color={statusBarStyle === "light" ? "#94A3B8" : "#64748B"}
+                      color={
+                        project.is_liked
+                          ? iconColors.danger
+                          : statusBarStyle === "light"
+                            ? "#94A3B8"
+                            : "#64748B"
+                      }
                     />
                     <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
                       {project.likes}
                     </AppText>
-                  </View>
+                  </Pressable>
                 </View>
               </View>
             </View>

@@ -213,6 +213,7 @@ create table if not exists public.rant_comments (
   parent_comment_id uuid references public.rant_comments(id) on delete cascade,
   user_id uuid references auth.users(id) on delete set null,
   content text not null,
+  is_anonymous boolean not null default false,
   likes int not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -225,6 +226,166 @@ create index if not exists rant_comments_created_at_idx on public.rant_comments(
 create trigger rant_comments_set_updated_at
 before update on public.rant_comments
 for each row execute procedure public.set_updated_at();
+
+create or replace function public.normalize_rant_comment_parent(p_parent_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_depth int := 0;
+  v_current uuid := p_parent_id;
+  v_next uuid;
+  v_steps int;
+  v_effective uuid := p_parent_id;
+begin
+  if p_parent_id is null then
+    return null;
+  end if;
+
+  loop
+    select parent_comment_id into v_next
+    from public.rant_comments
+    where id = v_current;
+
+    exit when v_next is null;
+    v_depth := v_depth + 1;
+    v_current := v_next;
+  end loop;
+
+  if v_depth >= 3 then
+    v_steps := v_depth - 2;
+    v_effective := p_parent_id;
+    for i in 1..v_steps loop
+      select parent_comment_id into v_effective
+      from public.rant_comments
+      where id = v_effective;
+      exit when v_effective is null;
+    end loop;
+  end if;
+
+  return v_effective;
+end;
+$$;
+
+create or replace function public.apply_rant_comment_parent()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.parent_comment_id := public.normalize_rant_comment_parent(new.parent_comment_id);
+  return new;
+end;
+$$;
+
+create or replace function public.add_rant_comment(
+  p_rant_id uuid,
+  p_parent_id uuid,
+  p_content text,
+  p_is_anonymous boolean
+)
+returns public.rant_comments
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_parent uuid;
+  v_row public.rant_comments;
+begin
+  if auth.uid() is null then
+    raise exception 'unauthenticated';
+  end if;
+
+  v_parent := public.normalize_rant_comment_parent(p_parent_id);
+
+  insert into public.rant_comments (
+    rant_id,
+    user_id,
+    content,
+    parent_comment_id,
+    is_anonymous
+  )
+  values (
+    p_rant_id,
+    auth.uid(),
+    p_content,
+    v_parent,
+    coalesce(p_is_anonymous, false)
+  )
+  returning * into v_row;
+
+  return v_row;
+end;
+$$;
+
+drop trigger if exists rant_comments_normalize_parent on public.rant_comments;
+create trigger rant_comments_normalize_parent
+before insert on public.rant_comments
+for each row
+execute procedure public.apply_rant_comment_parent();
+
+-- Rant comment likes
+create table if not exists public.rant_comment_likes (
+  comment_id uuid not null references public.rant_comments(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+
+create index if not exists rant_comment_likes_comment_id_idx on public.rant_comment_likes(comment_id);
+create index if not exists rant_comment_likes_user_id_idx on public.rant_comment_likes(user_id);
+
+create or replace function public.set_rant_comment_like(p_comment_id uuid, p_is_liked boolean)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_exists boolean;
+  v_likes int;
+begin
+  if auth.uid() is null then
+    raise exception 'unauthenticated';
+  end if;
+
+  select exists (
+    select 1
+    from public.rant_comment_likes
+    where comment_id = p_comment_id
+      and user_id = auth.uid()
+  ) into v_exists;
+
+  if p_is_liked and not v_exists then
+    insert into public.rant_comment_likes (comment_id, user_id)
+    values (p_comment_id, auth.uid());
+
+    update public.rant_comments c
+    set likes = c.likes + 1
+    where c.id = p_comment_id
+    returning c.likes into v_likes;
+  elsif (not p_is_liked) and v_exists then
+    delete from public.rant_comment_likes
+    where comment_id = p_comment_id
+      and user_id = auth.uid();
+
+    update public.rant_comments c
+    set likes = greatest(c.likes - 1, 0)
+    where c.id = p_comment_id
+    returning c.likes into v_likes;
+  else
+    select likes into v_likes
+    from public.rant_comments
+    where id = p_comment_id;
+  end if;
+
+  return coalesce(v_likes, 0);
+end;
+$$;
 
 -- Events
 create table if not exists public.events (

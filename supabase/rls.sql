@@ -6,6 +6,7 @@ alter table public.rants enable row level security;
 alter table public.rant_votes enable row level security;
 alter table public.rant_views enable row level security;
 alter table public.rant_comments enable row level security;
+alter table public.rant_comment_likes enable row level security;
 alter table public.events enable row level security;
 alter table public.event_attendees enable row level security;
 alter table public.spots enable row level security;
@@ -133,6 +134,22 @@ create policy "rant_comments_admin_delete"
   on public.rant_comments
   for delete
   using (public.is_admin());
+
+-- Rant comment likes
+create policy "rant_comment_likes_owner_read"
+  on public.rant_comment_likes
+  for select
+  using (auth.uid() = user_id);
+
+create policy "rant_comment_likes_owner_insert"
+  on public.rant_comment_likes
+  for insert
+  with check (auth.uid() = user_id);
+
+create policy "rant_comment_likes_owner_delete"
+  on public.rant_comment_likes
+  for delete
+  using (auth.uid() = user_id);
 
 -- Events
 create policy "events_public_read"
