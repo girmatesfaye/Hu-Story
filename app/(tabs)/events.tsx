@@ -34,6 +34,16 @@ type EventItem = {
 const fallbackEventImage =
   "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=600&q=80";
 
+const resolveEventCoverUrl = (coverUrl: string | null) => {
+  const normalized = coverUrl?.trim();
+  if (!normalized) return null;
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  const { data } = supabase.storage
+    .from("event-covers")
+    .getPublicUrl(normalized);
+  return data.publicUrl;
+};
+
 const formatEventTime = (startAt: string | null, endAt: string | null) => {
   if (!startAt) return "Time TBD";
   const startDate = new Date(startAt);
@@ -412,7 +422,9 @@ export default function EventTabScreen() {
                     : "Paid"
                   : "Free"
               }
-              image={event.cover_url ?? fallbackEventImage}
+              image={
+                resolveEventCoverUrl(event.cover_url) ?? fallbackEventImage
+              }
               badge="Today"
               host={event.host_name ? `By ${event.host_name}` : undefined}
               iconColor={iconColor}
@@ -438,7 +450,9 @@ export default function EventTabScreen() {
                     : "Paid"
                   : "Free"
               }
-              image={event.cover_url ?? fallbackEventImage}
+              image={
+                resolveEventCoverUrl(event.cover_url) ?? fallbackEventImage
+              }
               host={event.host_name ? `By ${event.host_name}` : undefined}
               iconColor={iconColor}
               onPress={() => router.push(`../events/${event.id}`)}
