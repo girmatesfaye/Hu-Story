@@ -501,6 +501,7 @@ create table if not exists public.spots (
   description text,
   cover_url text,
   price_type text,
+  price_amount numeric(10,2),
   rating_avg numeric(3,2) not null default 0,
   review_count int not null default 0,
   created_at timestamptz not null default now(),
@@ -696,6 +697,17 @@ create table if not exists public.project_views (
 create index if not exists project_views_project_id_idx on public.project_views(project_id);
 create index if not exists project_views_user_id_idx on public.project_views(user_id);
 
+-- Anonymous project views (per device)
+create table if not exists public.project_view_devices (
+  project_id uuid not null references public.projects(id) on delete cascade,
+  device_id text not null,
+  created_at timestamptz not null default now(),
+  primary key (project_id, device_id)
+);
+
+create index if not exists project_view_devices_project_id_idx
+  on public.project_view_devices(project_id);
+
 create or replace function public.increment_project_views(p_project_id uuid)
 returns int
 language plpgsql
@@ -723,6 +735,51 @@ begin
   if not v_exists then
     insert into public.project_views (project_id, user_id)
     values (p_project_id, auth.uid());
+
+    update public.projects p
+    set views = p.views + 1
+    where p.id = p_project_id
+    returning p.views into v_views;
+  else
+    select views into v_views
+    from public.projects
+    where id = p_project_id;
+  end if;
+
+  return coalesce(v_views, 0);
+end;
+$$;
+
+create or replace function public.increment_project_views_anon(
+  p_project_id uuid,
+  p_device_id text
+)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_exists boolean;
+  v_views int;
+begin
+  if p_device_id is null or length(trim(p_device_id)) = 0 then
+    select views into v_views
+    from public.projects
+    where id = p_project_id;
+    return coalesce(v_views, 0);
+  end if;
+
+  select exists (
+    select 1
+    from public.project_view_devices
+    where project_id = p_project_id
+      and device_id = p_device_id
+  ) into v_exists;
+
+  if not v_exists then
+    insert into public.project_view_devices (project_id, device_id)
+    values (p_project_id, p_device_id);
 
     update public.projects p
     set views = p.views + 1

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import {
   Image,
+  Linking,
   Pressable,
   ScrollView,
   TouchableOpacity,
   View,
   useColorScheme,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -70,6 +72,22 @@ export default function ProjectDetailsScreen() {
     danger: scheme === "dark" ? "#F87171" : "#DC2626",
   };
 
+  const normalizeRepoUrl = (url: string | null) => {
+    const trimmed = url?.trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const getAnonViewerId = async () => {
+    const key = "anon_viewer_id";
+    const existing = await AsyncStorage.getItem(key);
+    if (existing) return existing;
+    const generated = `anon-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await AsyncStorage.setItem(key, generated);
+    return generated;
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -130,12 +148,25 @@ export default function ProjectDetailsScreen() {
 
     const incrementViews = async () => {
       if (!id) return;
-      const { data: viewsData, error: viewsError } = await supabase.rpc(
-        "increment_project_views",
-        { p_project_id: id },
+
+      if (session?.user?.id) {
+        const { data: viewsData, error: viewsError } = await supabase.rpc(
+          "increment_project_views",
+          { p_project_id: id },
+        );
+        if (!viewsError && isMounted && typeof viewsData === "number") {
+          setProject((prev) => (prev ? { ...prev, views: viewsData } : prev));
+        }
+        return;
+      }
+
+      const anonId = await getAnonViewerId();
+      const { data: anonViews, error: anonError } = await supabase.rpc(
+        "increment_project_views_anon",
+        { p_project_id: id, p_device_id: anonId },
       );
-      if (!viewsError && isMounted && typeof viewsData === "number") {
-        setProject((prev) => (prev ? { ...prev, views: viewsData } : prev));
+      if (!anonError && isMounted && typeof anonViews === "number") {
+        setProject((prev) => (prev ? { ...prev, views: anonViews } : prev));
       }
     };
 
@@ -181,6 +212,22 @@ export default function ProjectDetailsScreen() {
     if (typeof data === "number") {
       setProject((prev) => (prev ? { ...prev, likes: data } : prev));
     }
+  };
+
+  const handleOpenRepo = async () => {
+    const url = normalizeRepoUrl(project?.repo_url ?? null);
+    if (!url) {
+      setErrorMessage("No repository link provided.");
+      return;
+    }
+
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      setErrorMessage("Unable to open the repository link.");
+      return;
+    }
+
+    await Linking.openURL(url);
   };
 
   return (
@@ -326,7 +373,13 @@ export default function ProjectDetailsScreen() {
         </ScrollView>
 
         <View className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
-          <Pressable className="flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3">
+          <Pressable
+            onPress={handleOpenRepo}
+            disabled={!project?.repo_url}
+            className={`flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 ${
+              !project?.repo_url ? "opacity-60" : ""
+            }`}
+          >
             <AppText className="text-sm font-semibold text-white">
               View Repository
             </AppText>

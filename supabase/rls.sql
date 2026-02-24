@@ -15,6 +15,7 @@ alter table public.spot_reviews enable row level security;
 alter table public.projects enable row level security;
 alter table public.project_likes enable row level security;
 alter table public.project_views enable row level security;
+alter table public.project_view_devices enable row level security;
 alter table public.notifications enable row level security;
 alter table public.reports enable row level security;
 alter table public.admin_emails enable row level security;
@@ -319,6 +320,17 @@ create policy "project_views_owner_insert"
   on public.project_views
   for insert
   with check (auth.uid() = user_id);
+
+-- Anonymous project views
+create policy "project_view_devices_public_read"
+  on public.project_view_devices
+  for select
+  using (true);
+
+create policy "project_view_devices_public_insert"
+  on public.project_view_devices
+  for insert
+  with check (true);
 
 -- Notifications
 create policy "notifications_owner_read"

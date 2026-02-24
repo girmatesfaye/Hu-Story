@@ -31,6 +31,7 @@ export default function CreateSpotScreen() {
   };
   const { colors } = useTheme();
   const [feeType, setFeeType] = useState<"free" | "paid">("free");
+  const [priceAmount, setPriceAmount] = useState("");
   const [name, setName] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
   const [location, setLocation] = useState("");
@@ -122,6 +123,20 @@ export default function CreateSpotScreen() {
       return;
     }
 
+    if (feeType === "paid" && !priceAmount.trim()) {
+      setErrorMessage("Enter the price for this spot.");
+      return;
+    }
+
+    const parsedPrice = priceAmount.trim() ? Number(priceAmount.trim()) : null;
+    if (
+      feeType === "paid" &&
+      (parsedPrice === null || Number.isNaN(parsedPrice))
+    ) {
+      setErrorMessage("Price must be a number.");
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -141,6 +156,7 @@ export default function CreateSpotScreen() {
         location: location.trim() || null,
         description: description.trim() || null,
         price_type: feeType,
+        price_amount: feeType === "paid" ? parsedPrice : null,
         cover_url: coverUrl,
       })
       .select("id")
@@ -244,12 +260,6 @@ export default function CreateSpotScreen() {
           <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Category
           </AppText>
-          <Pressable className="mt-2 flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <AppText className="text-sm text-slate-900 dark:text-slate-100">
-              Select a category
-            </AppText>
-            <Ionicons name="chevron-down" size={18} color={colors.mutedText} />
-          </Pressable>
 
           <View className="mt-3 flex-row flex-wrap gap-2">
             {categories.map((option) => (
@@ -336,6 +346,28 @@ export default function CreateSpotScreen() {
                 Paid
               </AppText>
             </Pressable>
+          </View>
+
+          <View
+            className="mt-3 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            style={{ display: feeType === "paid" ? "flex" : "none" }}
+          >
+            <Ionicons
+              name="pricetag-outline"
+              size={16}
+              color={colors.mutedText}
+            />
+            <TextInput
+              placeholder="Enter price"
+              placeholderTextColor={colors.mutedStrong}
+              className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+              keyboardType="numeric"
+              value={priceAmount}
+              onChangeText={setPriceAmount}
+            />
+            <AppText className="text-xs text-slate-400 dark:text-slate-500">
+              ETB
+            </AppText>
           </View>
 
           <View className="mt-6 flex-row items-center gap-2">
