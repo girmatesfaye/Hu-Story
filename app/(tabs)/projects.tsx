@@ -58,6 +58,8 @@ export default function ProjectsTabScreen() {
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"recent" | "views" | "likes">("recent");
+  const [showSort, setShowSort] = useState(false);
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
     muted: scheme === "dark" ? "#94A3B8" : "#64748B",
@@ -71,12 +73,20 @@ export default function ProjectsTabScreen() {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("projects")
       .select(
         "id, user_id, is_anonymous, title, summary, tags, created_at, views, likes, cover_url",
-      )
-      .order("created_at", { ascending: false });
+      );
+
+    query =
+      sortBy === "views"
+        ? query.order("views", { ascending: false })
+        : sortBy === "likes"
+          ? query.order("likes", { ascending: false })
+          : query.order("created_at", { ascending: false });
+
+    const { data, error } = await query;
 
     if (!isMounted) return;
 
@@ -133,7 +143,7 @@ export default function ProjectsTabScreen() {
     return () => {
       isMounted = false;
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, sortBy]);
 
   useEffect(() => {
     void loadProjects();
@@ -221,6 +231,7 @@ export default function ProjectsTabScreen() {
           <TouchableOpacity
             className="h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-slate-900"
             accessibilityRole="button"
+            onPress={() => setShowSort((prev) => !prev)}
           >
             <Ionicons
               name="options-outline"
@@ -229,6 +240,74 @@ export default function ProjectsTabScreen() {
             />
           </TouchableOpacity>
         </View>
+
+        {showSort ? (
+          <View className="mt-3 flex-row gap-2">
+            <Pressable
+              onPress={() => {
+                setSortBy("recent");
+                setShowSort(false);
+              }}
+              className={`rounded-full px-4 py-2 ${
+                sortBy === "recent"
+                  ? "bg-emerald-600"
+                  : "bg-slate-100 dark:bg-slate-900"
+              }`}
+            >
+              <AppText
+                className={`text-xs font-semibold ${
+                  sortBy === "recent"
+                    ? "text-white"
+                    : "text-slate-600 dark:text-slate-300"
+                }`}
+              >
+                Recent
+              </AppText>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setSortBy("views");
+                setShowSort(false);
+              }}
+              className={`rounded-full px-4 py-2 ${
+                sortBy === "views"
+                  ? "bg-emerald-600"
+                  : "bg-slate-100 dark:bg-slate-900"
+              }`}
+            >
+              <AppText
+                className={`text-xs font-semibold ${
+                  sortBy === "views"
+                    ? "text-white"
+                    : "text-slate-600 dark:text-slate-300"
+                }`}
+              >
+                Most Viewed
+              </AppText>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setSortBy("likes");
+                setShowSort(false);
+              }}
+              className={`rounded-full px-4 py-2 ${
+                sortBy === "likes"
+                  ? "bg-emerald-600"
+                  : "bg-slate-100 dark:bg-slate-900"
+              }`}
+            >
+              <AppText
+                className={`text-xs font-semibold ${
+                  sortBy === "likes"
+                    ? "text-white"
+                    : "text-slate-600 dark:text-slate-300"
+                }`}
+              >
+                Most Liked
+              </AppText>
+            </Pressable>
+          </View>
+        ) : null}
 
         {isLoading ? (
           <AppText className="mt-6 text-sm text-slate-400 dark:text-slate-500">
