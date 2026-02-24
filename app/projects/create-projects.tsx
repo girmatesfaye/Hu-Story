@@ -1,4 +1,5 @@
 import {
+  Image,
   ScrollView,
   Switch,
   TextInput,
@@ -15,6 +16,7 @@ import { Pressable } from "react-native";
 import { useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import * as ImagePicker from "expo-image-picker";
 export default function CreateProjectsScreen() {
   const router = useRouter();
   const { colors, statusBarStyle } = useTheme();
@@ -24,8 +26,62 @@ export default function CreateProjectsScreen() {
   const [tagsText, setTagsText] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(true);
+  const [coverImageUri, setCoverImageUri] = useState<string | null>(null);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handlePickCover = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      setErrorMessage("Permission needed to select a cover image.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      aspect: [16, 9],
+    });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setCoverImageUri(result.assets[0].uri);
+    }
+  };
+
+  const uploadCoverImage = async () => {
+    if (!coverImageUri || !session?.user) return null;
+
+    setIsUploadingCover(true);
+    try {
+      const response = await fetch(coverImageUri);
+      const arrayBuffer = await response.arrayBuffer();
+      const fileData = new Uint8Array(arrayBuffer);
+      const fileExt = coverImageUri.split(".").pop()?.split("?")[0] || "jpg";
+      const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
+      const contentType = `image/${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("project-covers")
+        .upload(filePath, fileData, { contentType, upsert: false });
+
+      if (uploadError) {
+        setErrorMessage(uploadError.message);
+        return null;
+      }
+
+      const { data } = supabase.storage
+        .from("project-covers")
+        .getPublicUrl(filePath);
+      const publicUrl = data.publicUrl;
+      setCoverImageUrl(publicUrl);
+      return publicUrl;
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!session?.user) {
@@ -46,6 +102,8 @@ export default function CreateProjectsScreen() {
       .map((tag) => tag.trim())
       .filter(Boolean);
 
+    const coverUrl = await uploadCoverImage();
+
     const { error } = await supabase.from("projects").insert({
       user_id: session.user.id,
       is_anonymous: isAnonymous,
@@ -54,6 +112,7 @@ export default function CreateProjectsScreen() {
       details: null,
       tags: tags.length > 0 ? tags : null,
       repo_url: repoUrl.trim() || null,
+      cover_url: coverUrl,
     });
 
     setIsSubmitting(false);
@@ -213,19 +272,28 @@ export default function CreateProjectsScreen() {
             <TouchableOpacity
               className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 dark:border-slate-700 dark:bg-slate-900"
               accessibilityRole="button"
+              onPress={handlePickCover}
             >
-              <View className="items-center">
-                <View className="h-12 w-12 items-center justify-center rounded-2xl bg-slate-200 dark:bg-slate-800">
-                  <Ionicons
-                    name="image-outline"
-                    size={20}
-                    color={colors.mutedText}
-                  />
+              {coverImageUri || coverImageUrl ? (
+                <Image
+                  source={{ uri: coverImageUri ?? coverImageUrl ?? undefined }}
+                  className="h-40 w-full rounded-xl"
+                  resizeMode="cover"
+                />
+              ) : (
+                <View className="items-center">
+                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-slate-200 dark:bg-slate-800">
+                    <Ionicons
+                      name="image-outline"
+                      size={20}
+                      color={colors.mutedText}
+                    />
+                  </View>
+                  <AppText className="mt-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    {isUploadingCover ? "Uploading..." : "Upload cover image"}
+                  </AppText>
                 </View>
-                <AppText className="mt-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  Upload cover image
-                </AppText>
-              </View>
+              )}
             </TouchableOpacity>
           </View>
 
