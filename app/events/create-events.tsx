@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import Feather from "@expo/vector-icons/Feather";
@@ -12,8 +12,10 @@ import * as ImagePicker from "expo-image-picker";
 
 export default function CreateEventScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id?: string }>();
   const { colors } = useTheme();
   const { session } = useSupabase();
+  const isEditing = Boolean(id);
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
   const [hostName, setHostName] = useState("");
@@ -53,6 +55,70 @@ export default function CreateEventScreen() {
 
     return `${dateTrimmed}T${timePart}${offset}`;
   };
+
+  const formatDateInput = (value: string | null) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (num: number) => num.toString().padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate(),
+    )}`;
+  };
+
+  const formatTimeInput = (value: string | null) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (num: number) => num.toString().padStart(2, "0");
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadEvent = async () => {
+      if (!id) return;
+
+      const { data, error } = await supabase
+        .from("events")
+        .select(
+          "title, description, start_at, end_at, location, host_name, fee_type, fee_amount, tags, cover_url",
+        )
+        .eq("id", id)
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+
+      setTitle(data?.title ?? "");
+      setDetails(data?.description ?? "");
+      setLocation(data?.location ?? "");
+      setHostName(data?.host_name ?? "");
+      setFeeType((data?.fee_type as "free" | "paid") ?? "free");
+      setFeeAmount(
+        data?.fee_amount !== null && data?.fee_amount !== undefined
+          ? String(data.fee_amount)
+          : "",
+      );
+      setTagsText((data?.tags ?? []).join(", "));
+      setStartDate(formatDateInput(data?.start_at ?? null));
+      setEndDate(formatDateInput(data?.end_at ?? null));
+      setStartTime(formatTimeInput(data?.start_at ?? null));
+      setEndTime(formatTimeInput(data?.end_at ?? null));
+      setCoverImageUrl(data?.cover_url ?? null);
+    };
+
+    loadEvent();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
 
   const handlePickCover = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -138,10 +204,13 @@ export default function CreateEventScreen() {
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    const coverUrl = await uploadCoverImage();
+    const coverUrl = coverImageUri ? await uploadCoverImage() : coverImageUrl;
+    if (coverImageUri && !coverUrl) {
+      setIsSubmitting(false);
+      return;
+    }
 
-    const { error } = await supabase.from("events").insert({
-      user_id: session.user.id,
+    const payload = {
       title: title.trim(),
       description: details.trim() || null,
       tags: tagsText
@@ -155,7 +224,14 @@ export default function CreateEventScreen() {
       fee_type: feeType,
       fee_amount: feeType === "paid" ? parsedFee : null,
       cover_url: coverUrl,
-    });
+    };
+
+    const { error } = isEditing
+      ? await supabase.from("events").update(payload).eq("id", id)
+      : await supabase.from("events").insert({
+          user_id: session.user.id,
+          ...payload,
+        });
 
     setIsSubmitting(false);
 
@@ -180,7 +256,7 @@ export default function CreateEventScreen() {
           </Pressable>
 
           <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Create Event
+            {isEditing ? "Edit Event" : "Create Event"}
           </AppText>
           <View className="w-14" />
         </View>
@@ -467,7 +543,13 @@ export default function CreateEventScreen() {
             disabled={isSubmitting}
           >
             <AppText className="text-sm font-semibold text-white">
-              {isSubmitting ? "Posting..." : "Post Event"}
+              {isSubmitting
+                ? isEditing
+                  ? "Saving..."
+                  : "Posting..."
+                : isEditing
+                  ? "Save Changes"
+                  : "Post Event"}
             </AppText>
             <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
           </Pressable>

@@ -80,6 +80,10 @@ export default function RootLayout() {
             name="profiles/edit-profile"
             options={{ headerShown: false }}
           />
+          <Stack.Screen
+            name="profiles/settings"
+            options={{ headerShown: false }}
+          />
         </Stack>
         <StatusBar style={statusBarStyle} />
       </View>

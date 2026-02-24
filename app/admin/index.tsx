@@ -50,6 +50,9 @@ const formatUserLabel = (userId?: string | null) => {
   return `${userId.slice(0, 6)}...${userId.slice(-4)}`;
 };
 
+const formatReportId = (value: string) =>
+  value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
+
 const normalizeType = (value: string) => value.toLowerCase();
 
 const tableByType: Record<string, string> = {
@@ -81,21 +84,23 @@ function ModerationCard({
 
   return (
     <View className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2">
-          <View className="rounded-full bg-emerald-100 px-2.5 py-1 dark:bg-emerald-500/20">
-            <AppText className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-200">
-              {typeLabel}
-            </AppText>
-          </View>
-          <AppText className="text-xs text-slate-400">#{item.id}</AppText>
-          <AppText className="text-xs text-slate-400">• {timeLabel}</AppText>
+      <View className="flex-row items-start justify-between">
+        <View className="rounded-full bg-emerald-100 px-2.5 py-1 dark:bg-emerald-500/20">
+          <AppText className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-200">
+            {typeLabel}
+          </AppText>
         </View>
         <View className="rounded-full bg-red-50 px-3 py-1">
           <AppText className="text-[11px] font-semibold text-red-600">
             {item.reason}
           </AppText>
         </View>
+      </View>
+      <View className="mt-2 flex-row items-center gap-2">
+        <AppText className="text-xs text-slate-400">
+          #{formatReportId(item.id)}
+        </AppText>
+        <AppText className="text-xs text-slate-400">• {timeLabel}</AppText>
       </View>
 
       <View className="mt-4 flex-row items-center gap-3">
@@ -385,12 +390,14 @@ export default function AdminScreen() {
               Campus Story (HU)
             </AppText>
           </View>
-          <Pressable className="h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-            <Ionicons
-              name="notifications-outline"
-              size={20}
-              color={colors.text}
-            />
+          <Pressable
+            onPress={async () => {
+              await supabase.auth.signOut();
+              router.replace("/(auth)/login");
+            }}
+            className="h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+          >
+            <Ionicons name="log-out-outline" size={20} color={colors.text} />
           </Pressable>
         </View>
 

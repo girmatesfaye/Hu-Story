@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import { useFocusEffect } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
 
 type Profile = {
   full_name: string | null;
@@ -21,6 +22,7 @@ type Profile = {
 type ProfileStats = {
   spots: number;
   rants: number;
+  events: number;
   projects: number;
 };
 
@@ -53,8 +55,17 @@ type ProjectItem = {
   cover_url: string | null;
 };
 
+type EventItem = {
+  id: string;
+  title: string;
+  start_at: string | null;
+  location: string | null;
+  cover_url: string | null;
+  attendees_count: number;
+};
+
 type DeleteTarget = {
-  type: "spots" | "rants" | "projects";
+  type: "spots" | "rants" | "events" | "projects";
   id: string;
   title: string;
 };
@@ -65,6 +76,8 @@ const fallbackSpotImage =
   "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80";
 const fallbackProjectImage =
   "https://images.unsplash.com/photo-1483721310020-03333e577078?auto=format&fit=crop&w=400&q=80";
+const fallbackEventImage =
+  "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=400&q=80";
 
 const formatTimeAgo = (dateString: string) => {
   const date = new Date(dateString);
@@ -87,19 +100,23 @@ export default function ProfileTabScreen() {
   const [stats, setStats] = useState<ProfileStats>({
     spots: 0,
     rants: 0,
+    events: 0,
     projects: 0,
   });
   const [activeSection, setActiveSection] = useState<
-    "spots" | "rants" | "projects"
+    "spots" | "rants" | "events" | "projects"
   >("spots");
   const [spots, setSpots] = useState<SpotItem[]>([]);
   const [rants, setRants] = useState<RantItem[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const loadProfile = useCallback(async () => {
     if (!session?.user) {
@@ -149,33 +166,39 @@ export default function ProfileTabScreen() {
     const loadStats = async () => {
       if (!session?.user) {
         if (isMounted) {
-          setStats({ spots: 0, rants: 0, projects: 0 });
+          setStats({ spots: 0, rants: 0, events: 0, projects: 0 });
         }
         return;
       }
 
       setIsLoadingStats(true);
 
-      const [spotsResult, rantsResult, projectsResult] = await Promise.all([
-        supabase
-          .from("spots")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", session.user.id),
-        supabase
-          .from("rants")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", session.user.id),
-        supabase
-          .from("projects")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", session.user.id),
-      ]);
+      const [spotsResult, rantsResult, eventsResult, projectsResult] =
+        await Promise.all([
+          supabase
+            .from("spots")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", session.user.id),
+          supabase
+            .from("rants")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", session.user.id),
+          supabase
+            .from("events")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", session.user.id),
+          supabase
+            .from("projects")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", session.user.id),
+        ]);
 
       if (!isMounted) return;
 
       setStats({
         spots: spotsResult.count ?? 0,
         rants: rantsResult.count ?? 0,
+        events: eventsResult.count ?? 0,
         projects: projectsResult.count ?? 0,
       });
       setIsLoadingStats(false);
@@ -247,6 +270,22 @@ export default function ProfileTabScreen() {
         }
       }
 
+      if (activeSection === "events") {
+        const { data, error } = await supabase
+          .from("events")
+          .select("id, title, start_at, location, cover_url, attendees_count")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false });
+
+        if (!isMounted) return;
+        if (error) {
+          setListError(error.message);
+          setEvents([]);
+        } else {
+          setEvents((data ?? []) as EventItem[]);
+        }
+      }
+
       setIsLoadingList(false);
     };
 
@@ -283,6 +322,9 @@ export default function ProfileTabScreen() {
     if (deleteTarget.type === "projects") {
       setProjects((prev) => prev.filter((item) => item.id !== deleteTarget.id));
     }
+    if (deleteTarget.type === "events") {
+      setEvents((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+    }
 
     setStats((prev) => ({
       ...prev,
@@ -299,6 +341,73 @@ export default function ProfileTabScreen() {
     "Student";
   const displayCampus = profile?.campus ?? "Hawassa University";
   const avatarUrl = profile?.avatar_url ?? fallbackAvatar;
+
+  const formatEventDate = (value: string | null) => {
+    if (!value) return "Date TBD";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Date TBD";
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const handlePickAvatar = async () => {
+    if (!session?.user) return;
+
+    setProfileError(null);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      setProfileError("Permission needed to select a profile photo.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      aspect: [1, 1],
+    });
+
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      const uri = result.assets[0].uri;
+      const response = await fetch(uri);
+      const arrayBuffer = await response.arrayBuffer();
+      const fileData = new Uint8Array(arrayBuffer);
+      const fileExt = uri.split(".").pop()?.split("?")[0] || "jpg";
+      const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
+      const contentType = `image/${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, fileData, { contentType, upsert: false });
+
+      if (uploadError) {
+        setProfileError(uploadError.message);
+        return;
+      }
+
+      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      const publicUrl = data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl })
+        .eq("user_id", session.user.id);
+
+      if (updateError) {
+        setProfileError(updateError.message);
+        return;
+      }
+
+      setProfile((prev) => (prev ? { ...prev, avatar_url: publicUrl } : prev));
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -322,6 +431,7 @@ export default function ProfileTabScreen() {
           <TouchableOpacity
             className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900"
             accessibilityRole="button"
+            onPress={() => router.push("/profiles/settings")}
           >
             <Ionicons
               name="settings-outline"
@@ -333,13 +443,17 @@ export default function ProfileTabScreen() {
 
         <View className="items-center pt-6">
           <View className="relative">
-            <View className="h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-200 shadow-sm dark:border-slate-950 dark:bg-slate-800">
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={handlePickAvatar}
+              className="h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-200 shadow-sm dark:border-slate-950 dark:bg-slate-800"
+            >
               <Image
                 source={{ uri: avatarUrl }}
                 className="h-full w-full rounded-full"
                 resizeMode="cover"
               />
-            </View>
+            </TouchableOpacity>
             <TouchableOpacity
               className="absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full bg-emerald-600 shadow-md"
               accessibilityRole="button"
@@ -368,6 +482,16 @@ export default function ProfileTabScreen() {
               {profile.bio}
             </AppText>
           ) : null}
+          {isUploadingAvatar ? (
+            <AppText className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+              Uploading photo...
+            </AppText>
+          ) : null}
+          {profileError ? (
+            <AppText className="mt-2 text-xs text-red-500">
+              {profileError}
+            </AppText>
+          ) : null}
         </View>
 
         <View className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-800">
@@ -386,6 +510,14 @@ export default function ProfileTabScreen() {
               </AppText>
               <AppText className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 RANTS
+              </AppText>
+            </View>
+            <View className="items-center">
+              <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {isLoadingStats ? "-" : stats.events}
+              </AppText>
+              <AppText className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                EVENTS
               </AppText>
             </View>
             <View className="items-center">
@@ -431,6 +563,24 @@ export default function ProfileTabScreen() {
                 }`}
               >
                 My Rants
+              </AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className={`flex-1 items-center pb-3 ${
+                activeSection === "events"
+                  ? "border-b-2 border-emerald-600"
+                  : ""
+              }`}
+              onPress={() => setActiveSection("events")}
+            >
+              <AppText
+                className={`text-sm font-semibold ${
+                  activeSection === "events"
+                    ? "text-emerald-600"
+                    : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                My Events
               </AppText>
             </TouchableOpacity>
             <TouchableOpacity
@@ -619,6 +769,86 @@ export default function ProfileTabScreen() {
               ))
             : null}
 
+          {activeSection === "events"
+            ? events.map((event) => (
+                <View
+                  key={event.id}
+                  className="flex-row items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <Image
+                    source={{ uri: event.cover_url ?? fallbackEventImage }}
+                    className="h-16 w-16 rounded-xl"
+                    resizeMode="cover"
+                  />
+                  <View className="flex-1">
+                    <View className="flex-row items-start justify-between">
+                      <View className="flex-1 pr-4">
+                        <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {event.title}
+                        </AppText>
+                        <AppText className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {formatEventDate(event.start_at)}
+                        </AppText>
+                      </View>
+                      <View className="flex-row items-center gap-4">
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          onPress={() =>
+                            setDeleteTarget({
+                              type: "events",
+                              id: event.id,
+                              title: event.title,
+                            })
+                          }
+                        >
+                          <MaterialIcons
+                            name="delete-forever"
+                            size={24}
+                            color={colors.mutedText}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          onPress={() =>
+                            router.push({
+                              pathname: "/events/create-events",
+                              params: { id: event.id },
+                            })
+                          }
+                        >
+                          <MaterialIcons
+                            name="edit"
+                            size={24}
+                            color={colors.mutedText}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <View className="mt-2 flex-row items-center">
+                      <Ionicons
+                        name="location"
+                        size={14}
+                        color={colors.accent}
+                      />
+                      <AppText className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                        {event.location ?? "Location TBD"}
+                      </AppText>
+                    </View>
+                    <View className="mt-2 flex-row items-center gap-1">
+                      <Ionicons
+                        name="people"
+                        size={14}
+                        color={colors.mutedText}
+                      />
+                      <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                        {event.attendees_count}
+                      </AppText>
+                    </View>
+                  </View>
+                </View>
+              ))
+            : null}
+
           {activeSection === "projects"
             ? projects.map((project) => (
                 <View
@@ -709,6 +939,7 @@ export default function ProfileTabScreen() {
           listError === null &&
           ((activeSection === "spots" && spots.length === 0) ||
             (activeSection === "rants" && rants.length === 0) ||
+            (activeSection === "events" && events.length === 0) ||
             (activeSection === "projects" && projects.length === 0)) ? (
             <AppText className="text-sm text-slate-400 dark:text-slate-500">
               No items yet.

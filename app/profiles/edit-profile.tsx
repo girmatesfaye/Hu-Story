@@ -14,6 +14,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import * as ImagePicker from "expo-image-picker";
 
 export default function EditProfileScreen() {
   const { colors, statusBarStyle } = useTheme();
@@ -23,6 +24,9 @@ export default function EditProfileScreen() {
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [campus, setCampus] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -35,7 +39,7 @@ export default function EditProfileScreen() {
 
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, username, bio, campus")
+        .select("full_name, username, bio, campus, avatar_url")
         .eq("user_id", session.user.id)
         .maybeSingle();
 
@@ -48,6 +52,7 @@ export default function EditProfileScreen() {
             session.user.user_metadata?.campus ??
             "Hawassa University",
         );
+        setAvatarUrl(data?.avatar_url ?? null);
       }
     };
 
@@ -57,6 +62,59 @@ export default function EditProfileScreen() {
       isMounted = false;
     };
   }, [session?.user]);
+
+  const handlePickAvatar = async () => {
+    if (!session?.user) {
+      setErrorMessage("You are not signed in.");
+      return;
+    }
+
+    setErrorMessage(null);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      setErrorMessage("Permission needed to select a profile photo.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      aspect: [1, 1],
+    });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setAvatarUri(result.assets[0].uri);
+    }
+  };
+
+  const uploadAvatar = async () => {
+    if (!avatarUri || !session?.user) return null;
+
+    setIsUploadingAvatar(true);
+    try {
+      const response = await fetch(avatarUri);
+      const arrayBuffer = await response.arrayBuffer();
+      const fileData = new Uint8Array(arrayBuffer);
+      const fileExt = avatarUri.split(".").pop()?.split("?")[0] || "jpg";
+      const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
+      const contentType = `image/${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, fileData, { contentType, upsert: false });
+
+      if (uploadError) {
+        setErrorMessage(uploadError.message);
+        return null;
+      }
+
+      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      return data.publicUrl;
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!session?.user) {
@@ -68,6 +126,12 @@ export default function EditProfileScreen() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    const nextAvatarUrl = avatarUri ? await uploadAvatar() : avatarUrl;
+    if (avatarUri && !nextAvatarUrl) {
+      setIsSaving(false);
+      return;
+    }
+
     const { error } = await supabase.from("profiles").upsert(
       {
         user_id: session.user.id,
@@ -75,6 +139,7 @@ export default function EditProfileScreen() {
         username: username.trim() || null,
         bio: bio.trim() || null,
         campus: campus.trim() || null,
+        avatar_url: nextAvatarUrl,
       },
       { onConflict: "user_id" },
     );
@@ -123,18 +188,29 @@ export default function EditProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View className="items-center pt-4">
-            <View className="h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-200 shadow-sm dark:border-slate-950 dark:bg-slate-800">
+            <TouchableOpacity
+              className="h-28 w-28 items-center justify-center rounded-full border-4 border-white bg-slate-200 shadow-sm dark:border-slate-950 dark:bg-slate-800"
+              accessibilityRole="button"
+              onPress={handlePickAvatar}
+            >
               <Image
                 source={{
-                  uri: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80",
+                  uri:
+                    avatarUri ??
+                    avatarUrl ??
+                    "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80",
                 }}
                 className="h-full w-full rounded-full"
                 resizeMode="cover"
               />
-            </View>
-            <TouchableOpacity className="mt-3" accessibilityRole="button">
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="mt-3"
+              accessibilityRole="button"
+              onPress={handlePickAvatar}
+            >
               <AppText className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                Change Profile Photo
+                {isUploadingAvatar ? "Uploading..." : "Change Profile Photo"}
               </AppText>
             </TouchableOpacity>
           </View>
