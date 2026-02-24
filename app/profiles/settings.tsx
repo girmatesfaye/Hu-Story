@@ -76,7 +76,7 @@ export default function SettingsScreen() {
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm dark:bg-slate-900"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.text} />
+            <Ionicons name="arrow-back" size={20} color={colors.text} />
           </Pressable>
           <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             Settings
