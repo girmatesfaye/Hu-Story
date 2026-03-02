@@ -126,9 +126,24 @@ export default function RantsScreen() {
         );
       }
 
+      let commentCountMap = new Map<string, number>();
+      if (rantIds.length > 0) {
+        const { data: commentRows } = await supabase
+          .from("rant_comments")
+          .select("rant_id")
+          .in("rant_id", rantIds);
+
+        commentCountMap = new Map();
+        (commentRows ?? []).forEach((row) => {
+          const key = row.rant_id as string;
+          commentCountMap.set(key, (commentCountMap.get(key) ?? 0) + 1);
+        });
+      }
+
       setRants(
         rows.map((rant) => ({
           ...rant,
+          comment_count: commentCountMap.get(rant.id) ?? 0,
           profile: rant.user_id ? profileMap.get(rant.user_id) : undefined,
           user_vote: voteMap.get(rant.id) ?? 0,
         })),
@@ -271,7 +286,7 @@ export default function RantsScreen() {
             <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
               HU Rants
             </AppText>
-            <AppText className="text-xs mt-[2px] text-slate-500 dark:text-slate-400">
+            <AppText className="text-xs mt-[2px] text-slate-500  dark:text-green-400">
               Hawassa University Anonymous Feed
             </AppText>
           </View>
@@ -331,9 +346,8 @@ export default function RantsScreen() {
             <AppText className="text-sm text-red-500">{errorMessage}</AppText>
           ) : null}
           {rants.map((rant) => (
-            <Pressable
+            <View
               key={rant.id}
-              onPress={() => router.push(`/rants/${rant.id}`)}
               className="rounded-2xl p-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
             >
               {/* Card Header */}
@@ -455,7 +469,7 @@ export default function RantsScreen() {
                   </Pressable>
                 </View>
               </View>
-            </Pressable>
+            </View>
           ))}
         </View>
 

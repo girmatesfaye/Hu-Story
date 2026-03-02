@@ -288,7 +288,7 @@ export default function EventTabScreen() {
             <AppText className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
               Upcoming Events
             </AppText>
-            <AppText className="text-sm text-slate-500 dark:text-slate-400">
+            <AppText className="text-sm text-slate-500  dark:text-green-400">
               Discover what's happening around campus
             </AppText>
           </View>
