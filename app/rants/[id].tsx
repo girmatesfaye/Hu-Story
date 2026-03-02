@@ -748,7 +748,6 @@ export default function RantCommentsScreen() {
           <View
             className="flex-row items-center px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
             style={{
-              paddingBottom: Math.max(insets.bottom, 8),
               marginBottom: Platform.OS === "android" ? keyboardHeight : 0,
             }}
           >

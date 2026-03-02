@@ -7,6 +7,7 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { useColorScheme } from "react-native";
 import { supabase } from "../../lib/supabase";
+import { formatEventDateRange } from "../../lib/eventDateTime";
 
 const buildDateChips = (count: number) =>
   Array.from({ length: count }, (_, index) => {
@@ -42,24 +43,6 @@ const resolveEventCoverUrl = (coverUrl: string | null) => {
     .from("event-covers")
     .getPublicUrl(normalized);
   return data.publicUrl;
-};
-
-const formatEventDate = (startAt: string | null, endAt: string | null) => {
-  if (!startAt) return "Date TBD";
-  const startDate = new Date(startAt);
-  if (Number.isNaN(startDate.getTime())) return "Date TBD";
-  const startLabel = startDate.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-  if (!endAt) return startLabel;
-  const endDate = new Date(endAt);
-  if (Number.isNaN(endDate.getTime())) return startLabel;
-  const endLabel = endDate.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-  return `${startLabel} - ${endLabel}`;
 };
 
 const isSameDay = (a: Date, b: Date) =>
@@ -411,7 +394,7 @@ export default function EventTabScreen() {
             <EventCard
               key={event.id}
               title={event.title}
-              time={formatEventDate(event.start_at, event.end_at)}
+              time={formatEventDateRange(event.start_at, event.end_at)}
               location={event.location ?? "Location TBD"}
               price={
                 event.fee_type?.toLowerCase() === "paid"
@@ -439,7 +422,7 @@ export default function EventTabScreen() {
             <EventCard
               key={event.id}
               title={event.title}
-              time={formatEventDate(event.start_at, event.end_at)}
+              time={formatEventDateRange(event.start_at, event.end_at)}
               location={event.location ?? "Location TBD"}
               price={
                 event.fee_type?.toLowerCase() === "paid"

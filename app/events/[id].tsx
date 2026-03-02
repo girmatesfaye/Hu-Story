@@ -7,6 +7,7 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
+import { formatEventDateRange } from "../../lib/eventDateTime";
 
 type EventDetail = {
   id: string;
@@ -33,24 +34,6 @@ const resolveEventCoverUrl = (coverUrl: string | null) => {
     .from("event-covers")
     .getPublicUrl(normalized);
   return data.publicUrl;
-};
-
-const formatEventDateTime = (value: string | null) => {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  return {
-    date: date.toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    }),
-    time: date.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    }),
-  };
 };
 
 export default function EventDetailsScreen() {
@@ -296,30 +279,15 @@ export default function EventDetailsScreen() {
                   />
                 </View>
                 <View className="flex-1">
-                  {(() => {
-                    const start = formatEventDateTime(event?.start_at ?? null);
-                    const end = formatEventDateTime(event?.end_at ?? null);
-                    if (!start) {
-                      return (
-                        <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          Time TBD
-                        </AppText>
-                      );
-                    }
-
-                    const dateRange = end
-                      ? `${start.date} - ${end.date}`
-                      : start.date;
-                    const timeRange = end
-                      ? `${start.time} - ${end.time}`
-                      : start.time;
-
-                    return (
-                      <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {dateRange} · {timeRange}
-                      </AppText>
-                    );
-                  })()}
+                  <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {formatEventDateRange(
+                      event?.start_at ?? null,
+                      event?.end_at ?? null,
+                      {
+                        fallback: "Time TBD",
+                      },
+                    )}
+                  </AppText>
                   <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     Add to calendar
                   </AppText>
