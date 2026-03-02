@@ -1,14 +1,96 @@
 import React, { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
+import {
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
+import { formatEventDateRange } from "../../lib/eventDateTime";
+
+type PickerTarget = "startDate" | "startTime" | "endDate" | "endTime";
+
+const toIsoWithOffset = (value: Date) => {
+  const pad = (num: number) => num.toString().padStart(2, "0");
+  const year = value.getFullYear();
+  const month = pad(value.getMonth() + 1);
+  const day = pad(value.getDate());
+  const hours = pad(value.getHours());
+  const minutes = pad(value.getMinutes());
+  const seconds = pad(value.getSeconds());
+  const offsetMinutes = -value.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absMinutes = Math.abs(offsetMinutes);
+  const offset = `${sign}${pad(Math.floor(absMinutes / 60))}:${pad(
+    absMinutes % 60,
+  )}`;
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offset}`;
+};
+
+const parseIsoToDate = (value: string | null) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const mergeDatePart = (base: Date | null, selected: Date) => {
+  const merged = base ? new Date(base) : new Date();
+  merged.setFullYear(
+    selected.getFullYear(),
+    selected.getMonth(),
+    selected.getDate(),
+  );
+  return merged;
+};
+
+const mergeTimePart = (base: Date | null, selected: Date) => {
+  const merged = base ? new Date(base) : new Date();
+  merged.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+  return merged;
+};
+
+const formatPickerDate = (value: Date | null) => {
+  if (!value) return "Select date";
+  return value.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const formatPickerTime = (value: Date | null) => {
+  if (!value) return "Select time";
+  return value.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const getPickerMode = (target: PickerTarget | null) =>
+  target?.toLowerCase().includes("time") ? "time" : "date";
+
+const getPickerTitle = (target: PickerTarget | null) => {
+  if (target === "startDate") return "Start date";
+  if (target === "startTime") return "Start time";
+  if (target === "endDate") return "End date";
+  if (target === "endTime") return "End time";
+  return "Date & time";
+};
 
 export default function CreateEventScreen() {
   const router = useRouter();
@@ -22,57 +104,15 @@ export default function CreateEventScreen() {
   const [details, setDetails] = useState("");
   const [feeType, setFeeType] = useState<"free" | "paid">("free");
   const [feeAmount, setFeeAmount] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [startAt, setStartAt] = useState<Date | null>(null);
+  const [endAt, setEndAt] = useState<Date | null>(null);
+  const [activePicker, setActivePicker] = useState<PickerTarget | null>(null);
   const [tagsText, setTagsText] = useState("");
   const [coverImageUri, setCoverImageUri] = useState<string | null>(null);
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const parseDateTime = (datePart: string, timePartRaw: string) => {
-    const dateTrimmed = datePart.trim();
-    const timeTrimmed = timePartRaw.trim();
-    if (!dateTrimmed || !timeTrimmed) return null;
-
-    const timePart =
-      timeTrimmed.length === 5 ? `${timeTrimmed}:00` : timeTrimmed;
-    const normalized = `${dateTrimmed}T${timePart}`;
-    const parsed = new Date(normalized);
-
-    if (Number.isNaN(parsed.getTime())) return "INVALID";
-
-    const pad = (num: number) => num.toString().padStart(2, "0");
-    const offsetMinutes = -parsed.getTimezoneOffset();
-    const sign = offsetMinutes >= 0 ? "+" : "-";
-    const absMinutes = Math.abs(offsetMinutes);
-    const offset = `${sign}${pad(Math.floor(absMinutes / 60))}:${pad(
-      absMinutes % 60,
-    )}`;
-
-    return `${dateTrimmed}T${timePart}${offset}`;
-  };
-
-  const formatDateInput = (value: string | null) => {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    const pad = (num: number) => num.toString().padStart(2, "0");
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-      date.getDate(),
-    )}`;
-  };
-
-  const formatTimeInput = (value: string | null) => {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    const pad = (num: number) => num.toString().padStart(2, "0");
-    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -106,10 +146,8 @@ export default function CreateEventScreen() {
           : "",
       );
       setTagsText((data?.tags ?? []).join(", "));
-      setStartDate(formatDateInput(data?.start_at ?? null));
-      setEndDate(formatDateInput(data?.end_at ?? null));
-      setStartTime(formatTimeInput(data?.start_at ?? null));
-      setEndTime(formatTimeInput(data?.end_at ?? null));
+      setStartAt(parseIsoToDate(data?.start_at ?? null));
+      setEndAt(parseIsoToDate(data?.end_at ?? null));
       setCoverImageUrl(data?.cover_url ?? null);
     };
 
@@ -171,6 +209,48 @@ export default function CreateEventScreen() {
     }
   };
 
+  const getPickerValue = () => {
+    if (activePicker === "startDate" || activePicker === "startTime") {
+      return startAt ?? new Date();
+    }
+    if (activePicker === "endDate" || activePicker === "endTime") {
+      return endAt ?? startAt ?? new Date();
+    }
+    return new Date();
+  };
+
+  const handlePickerChange = (
+    event: DateTimePickerEvent,
+    selectedDate?: Date,
+  ) => {
+    if (event.type === "dismissed") {
+      setActivePicker(null);
+      return;
+    }
+
+    if (!selectedDate || !activePicker) return;
+
+    if (activePicker === "startDate") {
+      setStartAt((current) => mergeDatePart(current, selectedDate));
+    }
+
+    if (activePicker === "startTime") {
+      setStartAt((current) => mergeTimePart(current, selectedDate));
+    }
+
+    if (activePicker === "endDate") {
+      setEndAt((current) => mergeDatePart(current, selectedDate));
+    }
+
+    if (activePicker === "endTime") {
+      setEndAt((current) => mergeTimePart(current, selectedDate));
+    }
+
+    if (Platform.OS === "android") {
+      setActivePicker(null);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!session?.user) {
       setErrorMessage("Please log in to create an event.");
@@ -193,13 +273,13 @@ export default function CreateEventScreen() {
       return;
     }
 
-    const startAtValue = parseDateTime(startDate, startTime);
-    const endAtValue = parseDateTime(endDate, endTime);
-
-    if (startAtValue === "INVALID" || endAtValue === "INVALID") {
-      setErrorMessage("Use format YYYY-MM-DD and HH:mm (LT).");
+    if (startAt && endAt && endAt.getTime() < startAt.getTime()) {
+      setErrorMessage("End date/time cannot be earlier than start date/time.");
       return;
     }
+
+    const startAtValue = startAt ? toIsoWithOffset(startAt) : null;
+    const endAtValue = endAt ? toIsoWithOffset(endAt) : null;
 
     setIsSubmitting(true);
     setErrorMessage(null);
@@ -217,8 +297,8 @@ export default function CreateEventScreen() {
         .split(",")
         .map((tag) => tag.trim())
         .filter(Boolean),
-      start_at: startAtValue === "INVALID" ? null : startAtValue,
-      end_at: endAtValue === "INVALID" ? null : endAtValue,
+      start_at: startAtValue,
+      end_at: endAtValue,
       location: location.trim() || null,
       host_name: hostName.trim() || null,
       fee_type: feeType,
@@ -304,70 +384,73 @@ export default function CreateEventScreen() {
             When
           </AppText>
           <View className="mt-2 gap-3">
-            <View className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <Pressable
+              onPress={() => setActivePicker("startDate")}
+              className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            >
               <Ionicons
                 name="calendar-outline"
                 size={18}
                 color={colors.mutedText}
               />
-              <TextInput
-                placeholder="Start date (YYYY-MM-DD)"
-                placeholderTextColor={colors.mutedStrong}
-                className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-                value={startDate}
-                onChangeText={setStartDate}
-              />
-              <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                LT
+              <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
+                {formatPickerDate(startAt)}
               </AppText>
-            </View>
-            <View className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                Start
+              </AppText>
+            </Pressable>
+            <Pressable
+              onPress={() => setActivePicker("endDate")}
+              className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            >
               <Ionicons
                 name="calendar-outline"
                 size={18}
                 color={colors.mutedText}
               />
-              <TextInput
-                placeholder="End date (YYYY-MM-DD)"
-                placeholderTextColor={colors.mutedStrong}
-                className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-                value={endDate}
-                onChangeText={setEndDate}
-              />
-              <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                LT
+              <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
+                {formatPickerDate(endAt)}
               </AppText>
-            </View>
+              <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                End
+              </AppText>
+            </Pressable>
             <View className="flex-row gap-3">
-              <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <Pressable
+                onPress={() => setActivePicker("startTime")}
+                className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
                 <Ionicons
                   name="time-outline"
                   size={18}
                   color={colors.mutedText}
                 />
-                <TextInput
-                  placeholder="Start (HH:mm)"
-                  placeholderTextColor={colors.mutedStrong}
-                  className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-                  value={startTime}
-                  onChangeText={setStartTime}
-                />
-              </View>
-              <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
+                  {formatPickerTime(startAt)}
+                </AppText>
+              </Pressable>
+              <Pressable
+                onPress={() => setActivePicker("endTime")}
+                className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
                 <Ionicons
                   name="time-outline"
                   size={18}
                   color={colors.mutedText}
                 />
-                <TextInput
-                  placeholder="End (HH:mm)"
-                  placeholderTextColor={colors.mutedStrong}
-                  className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-                  value={endTime}
-                  onChangeText={setEndTime}
-                />
-              </View>
+                <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
+                  {formatPickerTime(endAt)}
+                </AppText>
+              </Pressable>
             </View>
+            <AppText className="text-xs text-slate-500 dark:text-slate-400">
+              {formatEventDateRange(
+                startAt ? toIsoWithOffset(startAt) : null,
+                endAt ? toIsoWithOffset(endAt) : null,
+                { fallback: "Select start date and time" },
+              )}
+            </AppText>
           </View>
 
           <View className="mt-6 flex-row items-center justify-between">
@@ -533,6 +616,44 @@ export default function CreateEventScreen() {
             </AppText>
           ) : null}
         </ScrollView>
+
+        <Modal
+          visible={activePicker !== null}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setActivePicker(null)}
+        >
+          <View className="flex-1 justify-end bg-black/40">
+            <Pressable
+              className="flex-1"
+              onPress={() => setActivePicker(null)}
+            />
+            <View className="rounded-t-3xl bg-white px-5 pb-8 pt-4 dark:bg-slate-900">
+              <View className="mb-3 flex-row items-center justify-between">
+                <Pressable onPress={() => setActivePicker(null)}>
+                  <AppText className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                    Cancel
+                  </AppText>
+                </Pressable>
+                <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {getPickerTitle(activePicker)}
+                </AppText>
+                <Pressable onPress={() => setActivePicker(null)}>
+                  <AppText className="text-sm font-semibold text-green-600 dark:text-green-400">
+                    Done
+                  </AppText>
+                </Pressable>
+              </View>
+
+              <DateTimePicker
+                value={getPickerValue()}
+                mode={getPickerMode(activePicker)}
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={handlePickerChange}
+              />
+            </View>
+          </View>
+        </Modal>
 
         <View className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
           <Pressable
