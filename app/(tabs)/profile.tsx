@@ -423,7 +423,7 @@ export default function ProfileTabScreen() {
             accessibilityRole="button"
           >
             <Ionicons
-              name="chevron-back"
+              name="arrow-back"
               size={20}
               color={statusBarStyle === "light" ? "#E5E7EB" : "#0F172A"}
             />

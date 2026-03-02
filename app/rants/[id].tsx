@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import {
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   View,
   Pressable,
@@ -10,7 +13,10 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "../../components/AppText";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
@@ -75,6 +81,8 @@ export default function RantCommentsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
@@ -105,6 +113,22 @@ export default function RantCommentsScreen() {
     depthCache.set(commentId, depth);
     return depth;
   };
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const showSub = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -580,12 +604,20 @@ export default function RantCommentsScreen() {
               </Pressable>
 
               {replies.length > 0 ? (
-                <Pressable onPress={() => toggleReplies(comment.id)}>
+                <Pressable
+                  onPress={() => toggleReplies(comment.id)}
+                  className="flex-row items-center gap-1"
+                >
                   <AppText className="text-xs text-slate-500 dark:text-slate-400">
                     {isExpanded
                       ? "Hide replies"
                       : `View replies (${replies.length})`}
                   </AppText>
+                  <Ionicons
+                    name={isExpanded ? "chevron-up" : "chevron-down"}
+                    size={14}
+                    color={iconColors.muted}
+                  />
                 </Pressable>
               ) : null}
             </View>
@@ -601,23 +633,34 @@ export default function RantCommentsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-      <View className="flex-1 bg-white dark:bg-slate-950">
-        <ScrollView contentContainerClassName="px-[18px] py-4 pb-28">
-          {/* Header */}
-          <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-            <Pressable
-              onPress={() => router.back()}
-              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-            >
-              <Feather name="arrow-left" size={24} color="black" />
-            </Pressable>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
+        enabled={Platform.OS === "ios"}
+      >
+        <View className="flex-1 bg-white dark:bg-slate-950">
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName="px-[18px] py-4 pb-28"
+            contentContainerStyle={{ flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Header */}
+            <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+              <Pressable
+                onPress={() => router.back()}
+                className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+              >
+                <Feather name="arrow-left" size={24} color="black" />
+              </Pressable>
 
-            <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Comments
-            </AppText>
-            <View className="w-14" />
-          </View>
-          {/* <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+              <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Comments
+              </AppText>
+              <View className="w-14" />
+            </View>
+            {/* <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
             <Pressable
               onPress={() => router.back()}
               className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
@@ -630,123 +673,132 @@ export default function RantCommentsScreen() {
             </AppText>
             <View className="w-14" />
           </View> */}
-          {/* Rant Card */}
-          <View className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4">
-            <AppText className="text-sm font-semibold mb-2.5 text-slate-900 dark:text-slate-100">
-              Rant #{id ?? "-"}
-            </AppText>
-
-            {rant ? (
-              <View className="mb-3 flex-row items-center">
-                <View className="h-9 w-9 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                  <Image
-                    source={{
-                      uri: rant.is_anonymous
-                        ? "https://placehold.co/40x40/png"
-                        : (author?.avatar_url ?? fallbackAvatar),
-                    }}
-                    className="h-full w-full"
-                    resizeMode="cover"
-                  />
-                </View>
-                <View className="ml-2">
-                  <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {rant.is_anonymous
-                      ? "Anonymous Student"
-                      : author?.full_name || author?.username || "Student"}
-                  </AppText>
-                  {!rant.is_anonymous && author?.username ? (
-                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                      @{author.username}
-                    </AppText>
-                  ) : null}
-                </View>
-              </View>
-            ) : null}
-
-            <AppText className="text-[15px] leading-[22px] text-slate-900 dark:text-slate-100">
-              {isLoading
-                ? "Loading rant..."
-                : (rant?.content ?? "Rant not found.")}
-            </AppText>
-            {rant ? (
-              <View className="mt-3 flex-row items-center gap-2">
-                <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                  {formatTimeAgo(rant.created_at)}
-                </AppText>
-                <View className="h-1 w-1 rounded-full bg-slate-200 dark:bg-slate-800" />
-                <AppText className="text-xs text-green-600 dark:text-green-400">
-                  {rant.category ?? "General"}
-                </AppText>
-                <View className="h-1 w-1 rounded-full bg-slate-200 dark:bg-slate-800" />
-                <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                  {rant.views} views
-                </AppText>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Section Title */}
-          <AppText className="text-xs uppercase tracking-wider mb-3 text-slate-400 dark:text-slate-500">
-            Discussion
-          </AppText>
-
-          {errorMessage ? (
-            <AppText className="mb-3 text-sm text-red-500">
-              {errorMessage}
-            </AppText>
-          ) : null}
-
-          {/* Comments */}
-          {rootComments.map((comment) => renderComment(comment, 0))}
-        </ScrollView>
-
-        {/* Input Bar */}
-        <View className="absolute bottom-0 left-0 right-0 flex-row items-center px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          {replyToId ? (
-            <View className="absolute -top-7 left-4 right-4 flex-row items-center justify-between rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-900">
-              <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                Replying to a comment
+            {/* Rant Card */}
+            <View className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4">
+              <AppText className="text-sm font-semibold mb-2.5 text-slate-900 dark:text-slate-100">
+                Rant #{id ?? "-"}
               </AppText>
-              <Pressable onPress={() => setReplyToId(null)}>
-                <AppText className="text-xs text-green-600 dark:text-green-400">
-                  Cancel
-                </AppText>
-              </Pressable>
+
+              {rant ? (
+                <View className="mb-3 flex-row items-center">
+                  <View className="h-9 w-9 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                    <Image
+                      source={{
+                        uri: rant.is_anonymous
+                          ? "https://placehold.co/40x40/png"
+                          : (author?.avatar_url ?? fallbackAvatar),
+                      }}
+                      className="h-full w-full"
+                      resizeMode="cover"
+                    />
+                  </View>
+                  <View className="ml-2">
+                    <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {rant.is_anonymous
+                        ? "Anonymous Student"
+                        : author?.full_name || author?.username || "Student"}
+                    </AppText>
+                    {!rant.is_anonymous && author?.username ? (
+                      <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                        @{author.username}
+                      </AppText>
+                    ) : null}
+                  </View>
+                </View>
+              ) : null}
+
+              <AppText className="text-[15px] leading-[22px] text-slate-900 dark:text-slate-100">
+                {isLoading
+                  ? "Loading rant..."
+                  : (rant?.content ?? "Rant not found.")}
+              </AppText>
+              {rant ? (
+                <View className="mt-3 flex-row items-center gap-2">
+                  <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                    {formatTimeAgo(rant.created_at)}
+                  </AppText>
+                  <View className="h-1 w-1 rounded-full bg-slate-200 dark:bg-slate-800" />
+                  <AppText className="text-xs text-green-600 dark:text-green-400">
+                    {rant.category ?? "General"}
+                  </AppText>
+                  <View className="h-1 w-1 rounded-full bg-slate-200 dark:bg-slate-800" />
+                  <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                    {rant.views} views
+                  </AppText>
+                </View>
+              ) : null}
             </View>
-          ) : null}
-          <TextInput
-            placeholder={
-              replyToId ? "Write a reply..." : "Join the discussion..."
-            }
-            placeholderTextColor={iconColors.placeholder}
-            className="flex-1 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-full px-4 py-2 mr-2"
-            value={commentText}
-            onChangeText={setCommentText}
-          />
 
-          <Pressable
-            onPress={() => setIsAnonymousComment((prev) => !prev)}
-            className="w-10 h-10 rounded-full items-center justify-center bg-slate-100 dark:bg-slate-900 mr-2"
+            {/* Section Title */}
+            <AppText className="text-xs uppercase tracking-wider mb-3 text-slate-400 dark:text-slate-500">
+              Discussion
+            </AppText>
+
+            {errorMessage ? (
+              <AppText className="mb-3 text-sm text-red-500">
+                {errorMessage}
+              </AppText>
+            ) : null}
+
+            {/* Comments */}
+            {rootComments.map((comment) => renderComment(comment, 0))}
+          </ScrollView>
+
+          {/* Input Bar */}
+          <View
+            className="flex-row items-center px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+            style={{
+              paddingBottom: Math.max(insets.bottom, 8),
+              marginBottom: Platform.OS === "android" ? keyboardHeight : 0,
+            }}
           >
-            <Ionicons
-              name={isAnonymousComment ? "lock-closed" : "person-circle"}
-              size={18}
-              color={isAnonymousComment ? iconColors.accent : iconColors.muted}
+            {replyToId ? (
+              <View className="absolute -top-7 left-4 right-4 flex-row items-center justify-between rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-900">
+                <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                  Replying to a comment
+                </AppText>
+                <Pressable onPress={() => setReplyToId(null)}>
+                  <AppText className="text-xs text-green-600 dark:text-green-400">
+                    Cancel
+                  </AppText>
+                </Pressable>
+              </View>
+            ) : null}
+            <TextInput
+              placeholder={
+                replyToId ? "Write a reply..." : "Join the discussion..."
+              }
+              placeholderTextColor={iconColors.placeholder}
+              className="flex-1 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-full px-4 py-2 mr-2"
+              value={commentText}
+              onChangeText={setCommentText}
             />
-          </Pressable>
 
-          <Pressable
-            onPress={handleSend}
-            className={`w-10 h-10 rounded-full items-center justify-center bg-green-600 dark:bg-green-400 ${
-              isSending ? "opacity-60" : ""
-            }`}
-            disabled={isSending}
-          >
-            <Ionicons name="send" size={18} color={iconColors.chipText} />
-          </Pressable>
+            <Pressable
+              onPress={() => setIsAnonymousComment((prev) => !prev)}
+              className="w-10 h-10 rounded-full items-center justify-center bg-slate-100 dark:bg-slate-900 mr-2"
+            >
+              <Ionicons
+                name={isAnonymousComment ? "lock-closed" : "person-circle"}
+                size={18}
+                color={
+                  isAnonymousComment ? iconColors.accent : iconColors.muted
+                }
+              />
+            </Pressable>
+
+            <Pressable
+              onPress={handleSend}
+              className={`w-10 h-10 rounded-full items-center justify-center bg-green-600 dark:bg-green-400 ${
+                isSending ? "opacity-60" : ""
+              }`}
+              disabled={isSending}
+            >
+              <Ionicons name="send" size={18} color={iconColors.chipText} />
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
