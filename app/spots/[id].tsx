@@ -122,6 +122,7 @@ export default function SpotDetailsScreen() {
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1 bg-white dark:bg-slate-950">
         <ScrollView contentContainerClassName="pb-28">
+          {/* Header */}
           <View className="flex-row items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
             <Pressable
               onPress={() => router.back()}
@@ -132,11 +133,7 @@ export default function SpotDetailsScreen() {
             <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
               {spot?.name ?? "Spot Details"}
             </AppText>
-            <Pressable className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900">
-              <Ionicons name="share-outline" size={18} color={colors.text} />
-            </Pressable>
           </View>
-
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -159,7 +156,6 @@ export default function SpotDetailsScreen() {
               />
             )}
           </ScrollView>
-
           <View className="px-5 pt-4">
             <View className="flex-row items-center gap-3">
               <View className="rounded-full bg-green-100 px-3 py-1 dark:bg-green-400/20">
