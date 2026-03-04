@@ -1,4 +1,10 @@
-import { ScrollView, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  Platform,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Pressable,
+} from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -8,6 +14,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 export default function AddReviewScreen() {
   const router = useRouter();
@@ -15,6 +22,7 @@ export default function AddReviewScreen() {
   const { spotId } = useLocalSearchParams<{ spotId?: string }>();
   const { session } = useSupabase();
   const [reviewText, setReviewText] = useState("");
+  const [reviewHeight, setReviewHeight] = useState(220);
   const [rating, setRating] = useState(4);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -60,24 +68,31 @@ export default function AddReviewScreen() {
       <View className="flex-1 bg-white dark:bg-slate-950">
         <StatusBar style={statusBarStyle} />
         <View className="flex-row items-center justify-between px-5 pb-3 pt-6">
-          <TouchableOpacity
-            accessibilityRole="button"
+          <Pressable
             onPress={() => router.back()}
+            className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900"
           >
-            <AppText className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-              Cancel
-            </AppText>
-          </TouchableOpacity>
+            <Ionicons name="arrow-back" size={20} color={colors.text} />
+          </Pressable>
           <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
             Write a Review
           </AppText>
           <View className="w-12" />
         </View>
 
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="px-5 pb-28"
+        <KeyboardAwareScrollView
+          style={{ flex: 1 }}
+          contentContainerClassName="px-5"
+          contentContainerStyle={{ paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          enableOnAndroid
+          enableAutomaticScroll
+          enableResetScrollToCoords
+          extraHeight={Platform.OS === "android" ? 120 : 80}
+          extraScrollHeight={Platform.OS === "android" ? 56 : 20}
+          keyboardOpeningTime={0}
         >
           <View className="mt-4 items-center">
             <AppText className="text-xs font-semibold tracking-[3px] text-slate-400 dark:text-slate-500">
@@ -111,11 +126,26 @@ export default function AddReviewScreen() {
               <TextInput
                 placeholder="Tell others about the vibe, food, or noise level..."
                 placeholderTextColor={colors.mutedStrong}
-                className="min-h-[220px] text-sm text-slate-900 dark:text-slate-100"
+                className="text-sm text-slate-900 dark:text-slate-100"
                 multiline
+                scrollEnabled={false}
+                blurOnSubmit={false}
                 textAlignVertical="top"
+                style={{
+                  minHeight: 220,
+                  height: Math.max(220, reviewHeight),
+                }}
                 value={reviewText}
                 onChangeText={setReviewText}
+                onContentSizeChange={(event) => {
+                  const nextHeight = Math.max(
+                    220,
+                    Math.ceil(event.nativeEvent.contentSize.height),
+                  );
+                  if (Math.abs(nextHeight - reviewHeight) > 2) {
+                    setReviewHeight(nextHeight);
+                  }
+                }}
                 maxLength={500}
               />
               <View className="items-end">
@@ -125,16 +155,16 @@ export default function AddReviewScreen() {
               </View>
             </View>
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
-        <View className="absolute bottom-0 left-0 right-0 bg-white px-5 pb-8 pt-4 shadow-lg dark:bg-slate-950">
+        <View className="border-t border-slate-200 bg-white px-5 pb-8 pt-4 dark:border-slate-800 dark:bg-slate-950">
           {errorMessage ? (
             <AppText className="mb-3 text-sm text-red-500">
               {errorMessage}
             </AppText>
           ) : null}
           <TouchableOpacity
-            className={`h-12 w-full items-center justify-center rounded-2xl bg-emerald-600 ${
+            className={`h-12 w-full items-center justify-center rounded-2xl bg-green-500 ${
               isSubmitting ? "opacity-60" : ""
             }`}
             accessibilityRole="button"

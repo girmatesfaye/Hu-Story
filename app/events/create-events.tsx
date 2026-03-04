@@ -379,14 +379,14 @@ export default function CreateEventScreen() {
             {/* <ScrollView contentContainerClassName="px-5 pb-28 pt-5"> */}
             <KeyboardAwareScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: 24 }}
+              contentContainerStyle={{ paddingBottom: 160 }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               enableOnAndroid
               enableAutomaticScroll
-              enableResetScrollToCoords={false}
+              enableResetScrollToCoords
               extraHeight={Platform.OS === "android" ? 140 : 80}
-              extraScrollHeight={Platform.OS === "android" ? 32 : 0}
+              extraScrollHeight={Platform.OS === "android" ? 40 : 20}
               keyboardOpeningTime={0}
             >
               <View className="px-5 pt-5">
@@ -677,9 +677,17 @@ export default function CreateEventScreen() {
                   <TextInput
                     placeholder="Tell students what this event is about..."
                     placeholderTextColor={colors.mutedStrong}
-                    className="min-h-[110px] text-sm text-slate-900 dark:text-slate-100"
+                    className="text-sm text-slate-900 dark:text-slate-100"
                     multiline
+                    scrollEnabled
+                    blurOnSubmit={false}
                     textAlignVertical="top"
+                    style={{
+                      minHeight: 160,
+                      maxHeight: 220,
+                      paddingTop: 4,
+                      paddingBottom: 20,
+                    }}
                     value={details}
                     onChangeText={setDetails}
                   />
