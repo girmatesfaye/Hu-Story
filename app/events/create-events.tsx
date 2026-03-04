@@ -84,12 +84,24 @@ const formatPickerTime = (value: Date | null) => {
 const getPickerMode = (target: PickerTarget | null) =>
   target?.toLowerCase().includes("time") ? "time" : "date";
 
+const getPickerDisplay = (target: PickerTarget | null) => {
+  const mode = getPickerMode(target);
+  if (Platform.OS !== "ios") return "default";
+  return mode === "date" ? "inline" : "spinner";
+};
+
 const getPickerTitle = (target: PickerTarget | null) => {
-  if (target === "startDate") return "Start date";
-  if (target === "startTime") return "Start time";
-  if (target === "endDate") return "End date";
-  if (target === "endTime") return "End time";
+  if (target === "startDate") return "Start Date";
+  if (target === "startTime") return "Start Time";
+  if (target === "endDate") return "End Date";
+  if (target === "endTime") return "End Time";
   return "Date & time";
+};
+
+const getSuggestedEndDate = (startValue: Date) => {
+  const suggested = new Date(startValue);
+  suggested.setHours(suggested.getHours() + 1);
+  return suggested;
 };
 
 export default function CreateEventScreen() {
@@ -231,11 +243,31 @@ export default function CreateEventScreen() {
     if (!selectedDate || !activePicker) return;
 
     if (activePicker === "startDate") {
-      setStartAt((current) => mergeDatePart(current, selectedDate));
+      setStartAt((current) => {
+        const nextStart = mergeDatePart(current, selectedDate);
+        setEndAt((currentEnd) => {
+          if (!currentEnd) return getSuggestedEndDate(nextStart);
+          if (currentEnd.getTime() < nextStart.getTime()) {
+            return getSuggestedEndDate(nextStart);
+          }
+          return currentEnd;
+        });
+        return nextStart;
+      });
     }
 
     if (activePicker === "startTime") {
-      setStartAt((current) => mergeTimePart(current, selectedDate));
+      setStartAt((current) => {
+        const nextStart = mergeTimePart(current, selectedDate);
+        setEndAt((currentEnd) => {
+          if (!currentEnd) return getSuggestedEndDate(nextStart);
+          if (currentEnd.getTime() < nextStart.getTime()) {
+            return getSuggestedEndDate(nextStart);
+          }
+          return currentEnd;
+        });
+        return nextStart;
+      });
     }
 
     if (activePicker === "endDate") {
@@ -397,7 +429,7 @@ export default function CreateEventScreen() {
                 {formatPickerDate(startAt)}
               </AppText>
               <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                Start
+                Start Date
               </AppText>
             </Pressable>
             <Pressable
@@ -413,7 +445,7 @@ export default function CreateEventScreen() {
                 {formatPickerDate(endAt)}
               </AppText>
               <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                End
+                End Date
               </AppText>
             </Pressable>
             <View className="flex-row gap-3">
@@ -429,6 +461,9 @@ export default function CreateEventScreen() {
                 <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
                   {formatPickerTime(startAt)}
                 </AppText>
+                <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                  Start Time
+                </AppText>
               </Pressable>
               <Pressable
                 onPress={() => setActivePicker("endTime")}
@@ -441,6 +476,9 @@ export default function CreateEventScreen() {
                 />
                 <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
                   {formatPickerTime(endAt)}
+                </AppText>
+                <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                  End Time
                 </AppText>
               </Pressable>
             </View>
@@ -648,7 +686,7 @@ export default function CreateEventScreen() {
               <DateTimePicker
                 value={getPickerValue()}
                 mode={getPickerMode(activePicker)}
-                display={Platform.OS === "ios" ? "spinner" : "default"}
+                display={getPickerDisplay(activePicker)}
                 onChange={handlePickerChange}
               />
             </View>
