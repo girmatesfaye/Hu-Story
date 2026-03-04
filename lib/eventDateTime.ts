@@ -62,14 +62,15 @@ export const formatEventDateRange = (
   const startDayKey = getDateParts(start, locale, timeZone);
   const endDayKey = getDateParts(end, locale, timeZone);
   const endTimeLabel = formatTime(end, locale, timeZone);
+  const timeRangeLabel =
+    startTimeLabel === endTimeLabel
+      ? startTimeLabel
+      : `${startTimeLabel} – ${endTimeLabel}`;
 
   if (startDayKey && endDayKey && startDayKey === endDayKey) {
-    if (startTimeLabel === endTimeLabel) {
-      return `${startDateLabel} • ${startTimeLabel}`;
-    }
-    return `${startDateLabel} • ${startTimeLabel} – ${endTimeLabel}`;
+    return `${startDateLabel} • ${timeRangeLabel}`;
   }
 
   const endDateLabel = formatMonthDay(end, locale, timeZone);
-  return `${startDateLabel}, ${startTimeLabel} – ${endDateLabel}, ${endTimeLabel}`;
+  return `${startDateLabel} – ${endDateLabel}, ${timeRangeLabel}`;
 };
