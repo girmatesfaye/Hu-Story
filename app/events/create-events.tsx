@@ -4,9 +4,10 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   TextInput,
   View,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -21,6 +22,7 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
 import { formatEventDateRange } from "../../lib/eventDateTime";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 type PickerTarget = "startDate" | "startTime" | "endDate" | "endTime";
 
@@ -357,362 +359,400 @@ export default function CreateEventScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-      <View className="flex-1 bg-white dark:bg-slate-950">
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-          <Pressable
-            onPress={() => router.back()}
-            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-          >
-            <Feather name="arrow-left" size={24} color="black" />
-          </Pressable>
+      <View className="flex-1">
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View className="flex-1 bg-white dark:bg-slate-950">
+            {/* Header */}
+            <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+              <Pressable
+                onPress={() => router.back()}
+                className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+              >
+                <Feather name="arrow-left" size={24} color="black" />
+              </Pressable>
 
-          <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {isEditing ? "Edit Event" : "Create Event"}
-          </AppText>
-          <View className="w-14" />
-        </View>
-        <ScrollView contentContainerClassName="px-5 pb-28 pt-5">
-          <Pressable
-            onPress={handlePickCover}
-            className="h-40 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
-          >
-            {coverImageUri || coverImageUrl ? (
-              <Image
-                source={{ uri: coverImageUri ?? coverImageUrl ?? undefined }}
-                className="h-full w-full"
-                resizeMode="cover"
-              />
-            ) : (
-              <View className="items-center">
-                <View className="h-12 w-12 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800">
-                  <Ionicons
-                    name="image-outline"
-                    size={22}
-                    color={colors.mutedText}
+              <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {isEditing ? "Edit Event" : "Create Event"}
+              </AppText>
+              <View className="w-14" />
+            </View>
+            {/* <ScrollView contentContainerClassName="px-5 pb-28 pt-5"> */}
+            <KeyboardAwareScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 24 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              enableOnAndroid
+              enableAutomaticScroll
+              enableResetScrollToCoords={false}
+              extraHeight={Platform.OS === "android" ? 140 : 80}
+              extraScrollHeight={Platform.OS === "android" ? 32 : 0}
+              keyboardOpeningTime={0}
+            >
+              <View className="px-5 pt-5">
+                <Pressable
+                  onPress={handlePickCover}
+                  className="h-40 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  {coverImageUri || coverImageUrl ? (
+                    <Image
+                      source={{
+                        uri: coverImageUri ?? coverImageUrl ?? undefined,
+                      }}
+                      className="h-full w-full"
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View className="items-center">
+                      <View className="h-12 w-12 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800">
+                        <Ionicons
+                          name="image-outline"
+                          size={22}
+                          color={colors.mutedText}
+                        />
+                      </View>
+                      <AppText className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                        {isUploadingCover ? "Uploading..." : "Add Event Cover"}
+                      </AppText>
+                    </View>
+                  )}
+                </Pressable>
+
+                <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Event Title
+                </AppText>
+                <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <TextInput
+                    placeholder="e.g., Graduation Party"
+                    placeholderTextColor={colors.mutedStrong}
+                    className="text-sm text-slate-900 dark:text-slate-100"
+                    value={title}
+                    onChangeText={setTitle}
                   />
                 </View>
-                <AppText className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                  {isUploadingCover ? "Uploading..." : "Add Event Cover"}
+
+                <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  When
                 </AppText>
-              </View>
-            )}
-          </Pressable>
-
-          <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Event Title
-          </AppText>
-          <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <TextInput
-              placeholder="e.g., Graduation Party"
-              placeholderTextColor={colors.mutedStrong}
-              className="text-sm text-slate-900 dark:text-slate-100"
-              value={title}
-              onChangeText={setTitle}
-            />
-          </View>
-
-          <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            When
-          </AppText>
-          <View className="mt-2 gap-3">
-            <Pressable
-              onPress={() => setActivePicker("startDate")}
-              className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={18}
-                color={colors.mutedText}
-              />
-              <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
-                {formatPickerDate(startAt)}
-              </AppText>
-              <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                Start Date
-              </AppText>
-            </Pressable>
-            <Pressable
-              onPress={() => setActivePicker("endDate")}
-              className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={18}
-                color={colors.mutedText}
-              />
-              <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
-                {formatPickerDate(endAt)}
-              </AppText>
-              <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                End Date
-              </AppText>
-            </Pressable>
-            <View className="flex-row gap-3">
-              <Pressable
-                onPress={() => setActivePicker("startTime")}
-                className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-              >
-                <Ionicons
-                  name="time-outline"
-                  size={18}
-                  color={colors.mutedText}
-                />
-                <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
-                  {formatPickerTime(startAt)}
-                </AppText>
-                <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                  Start Time
-                </AppText>
-              </Pressable>
-              <Pressable
-                onPress={() => setActivePicker("endTime")}
-                className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-              >
-                <Ionicons
-                  name="time-outline"
-                  size={18}
-                  color={colors.mutedText}
-                />
-                <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
-                  {formatPickerTime(endAt)}
-                </AppText>
-                <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                  End Time
-                </AppText>
-              </Pressable>
-            </View>
-            <AppText className="text-xs text-slate-500 dark:text-slate-400">
-              {formatEventDateRange(
-                startAt ? toIsoWithOffset(startAt) : null,
-                endAt ? toIsoWithOffset(endAt) : null,
-                { fallback: "Select start date and time" },
-              )}
-            </AppText>
-          </View>
-
-          <View className="mt-6 flex-row items-center justify-between">
-            <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Where
-            </AppText>
-            <Pressable className="flex-row items-center gap-2">
-              <Ionicons name="map-outline" size={14} color={colors.accent} />
-              <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-                Select on Map
-              </AppText>
-            </Pressable>
-          </View>
-          <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <TextInput
-              placeholder="e.g., Main Campus Hall"
-              placeholderTextColor={colors.mutedStrong}
-              className="text-sm text-slate-900 dark:text-slate-100"
-              value={location}
-              onChangeText={setLocation}
-            />
-          </View>
-
-          <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-            <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80",
-              }}
-              className="h-[140px] w-full"
-              resizeMode="cover"
-            />
-            <View className="absolute inset-0 bg-white/40 dark:bg-slate-950/40" />
-            <View className="absolute inset-0 items-center justify-center">
-              <View className="flex-row items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow dark:bg-slate-900">
-                <Ionicons name="location" size={14} color={colors.accent} />
-                <AppText className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Hawassa Main Campus
-                </AppText>
-              </View>
-            </View>
-            <View className="absolute bottom-3 right-3 items-center gap-1 rounded-lg bg-white px-2 py-1 shadow dark:bg-slate-900">
-              <Ionicons name="add" size={14} color={colors.mutedText} />
-              <View className="h-px w-4 bg-slate-200 dark:bg-slate-800" />
-              <Ionicons name="remove" size={14} color={colors.mutedText} />
-            </View>
-          </View>
-
-          <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Organizer
-          </AppText>
-          <View className="mt-2 flex-row items-center gap-3">
-            <View className="h-11 w-11 items-center justify-center rounded-full bg-green-100 dark:bg-green-400/20">
-              <Ionicons name="person" size={18} color={colors.accent} />
-            </View>
-            <View className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <TextInput
-                placeholder="Club or Individual Name"
-                placeholderTextColor={colors.mutedStrong}
-                className="text-sm text-slate-900 dark:text-slate-100"
-                value={hostName}
-                onChangeText={setHostName}
-              />
-            </View>
-          </View>
-
-          <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Entry Fee
-          </AppText>
-          <View className="mt-2 flex-row rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
-            <Pressable
-              onPress={() => setFeeType("free")}
-              className="flex-1 items-center justify-center rounded-lg py-2.5"
-              style={{
-                backgroundColor:
-                  feeType === "free" ? colors.card : "transparent",
-              }}
-            >
-              <AppText
-                className="text-sm font-semibold"
-                style={{
-                  color: feeType === "free" ? colors.accent : colors.mutedText,
-                }}
-              >
-                Free
-              </AppText>
-            </Pressable>
-            <Pressable
-              onPress={() => setFeeType("paid")}
-              className="flex-1 items-center justify-center rounded-lg py-2.5"
-              style={{
-                backgroundColor:
-                  feeType === "paid" ? colors.card : "transparent",
-              }}
-            >
-              <AppText
-                className="text-sm font-semibold"
-                style={{
-                  color: feeType === "paid" ? colors.accent : colors.mutedText,
-                }}
-              >
-                Paid
-              </AppText>
-            </Pressable>
-          </View>
-
-          <View
-            className="mt-3 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-            style={{ display: feeType === "paid" ? "flex" : "none" }}
-          >
-            <Ionicons name="cash-outline" size={18} color={colors.mutedText} />
-            <TextInput
-              placeholder="Entry fee amount (ETB)"
-              placeholderTextColor={colors.mutedStrong}
-              className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-              keyboardType="numeric"
-              value={feeAmount}
-              onChangeText={setFeeAmount}
-            />
-          </View>
-
-          <View className="mt-6 flex-row items-center gap-2">
-            <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Details
-            </AppText>
-            <AppText className="text-xs text-slate-400 dark:text-slate-500">
-              (optional)
-            </AppText>
-          </View>
-          <View className="mt-4">
-            <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Tags
-            </AppText>
-            <View className="mt-2 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <Ionicons
-                name="pricetag-outline"
-                size={18}
-                color={colors.mutedText}
-              />
-              <TextInput
-                placeholder="Add tags (comma separated)"
-                placeholderTextColor={colors.mutedStrong}
-                className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-                value={tagsText}
-                onChangeText={setTagsText}
-              />
-            </View>
-          </View>
-          <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <TextInput
-              placeholder="Tell students what this event is about..."
-              placeholderTextColor={colors.mutedStrong}
-              className="min-h-[110px] text-sm text-slate-900 dark:text-slate-100"
-              multiline
-              textAlignVertical="top"
-              value={details}
-              onChangeText={setDetails}
-            />
-          </View>
-
-          {errorMessage ? (
-            <AppText className="mt-4 text-sm text-red-500">
-              {errorMessage}
-            </AppText>
-          ) : null}
-        </ScrollView>
-
-        <Modal
-          visible={activePicker !== null}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setActivePicker(null)}
-        >
-          <View className="flex-1 justify-end bg-black/40">
-            <Pressable
-              className="flex-1"
-              onPress={() => setActivePicker(null)}
-            />
-            <View className="rounded-t-3xl bg-white px-5 pb-8 pt-4 dark:bg-slate-900">
-              <View className="mb-3 flex-row items-center justify-between">
-                <Pressable onPress={() => setActivePicker(null)}>
-                  <AppText className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    Cancel
+                <View className="mt-2 gap-3">
+                  <Pressable
+                    onPress={() => setActivePicker("startDate")}
+                    className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color={colors.mutedText}
+                    />
+                    <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
+                      {formatPickerDate(startAt)}
+                    </AppText>
+                    <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                      Start Date
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setActivePicker("endDate")}
+                    className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color={colors.mutedText}
+                    />
+                    <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
+                      {formatPickerDate(endAt)}
+                    </AppText>
+                    <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                      End Date
+                    </AppText>
+                  </Pressable>
+                  <View className="flex-row gap-3">
+                    <Pressable
+                      onPress={() => setActivePicker("startTime")}
+                      className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <Ionicons
+                        name="time-outline"
+                        size={18}
+                        color={colors.mutedText}
+                      />
+                      <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
+                        {formatPickerTime(startAt)}
+                      </AppText>
+                      <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                        Start Time
+                      </AppText>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setActivePicker("endTime")}
+                      className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <Ionicons
+                        name="time-outline"
+                        size={18}
+                        color={colors.mutedText}
+                      />
+                      <AppText className="flex-1 text-sm text-slate-900 dark:text-slate-100">
+                        {formatPickerTime(endAt)}
+                      </AppText>
+                      <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                        End Time
+                      </AppText>
+                    </Pressable>
+                  </View>
+                  <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                    {formatEventDateRange(
+                      startAt ? toIsoWithOffset(startAt) : null,
+                      endAt ? toIsoWithOffset(endAt) : null,
+                      { fallback: "Select start date and time" },
+                    )}
                   </AppText>
-                </Pressable>
-                <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {getPickerTitle(activePicker)}
-                </AppText>
-                <Pressable onPress={() => setActivePicker(null)}>
-                  <AppText className="text-sm font-semibold text-green-600 dark:text-green-400">
-                    Done
-                  </AppText>
-                </Pressable>
-              </View>
+                </View>
 
-              <DateTimePicker
-                value={getPickerValue()}
-                mode={getPickerMode(activePicker)}
-                display={getPickerDisplay(activePicker)}
-                onChange={handlePickerChange}
-              />
+                <View className="mt-6 flex-row items-center justify-between">
+                  <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Where
+                  </AppText>
+                  <Pressable className="flex-row items-center gap-2">
+                    <Ionicons
+                      name="map-outline"
+                      size={14}
+                      color={colors.accent}
+                    />
+                    <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
+                      Select on Map
+                    </AppText>
+                  </Pressable>
+                </View>
+                <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <TextInput
+                    placeholder="e.g., Main Campus Hall"
+                    placeholderTextColor={colors.mutedStrong}
+                    className="text-sm text-slate-900 dark:text-slate-100"
+                    value={location}
+                    onChangeText={setLocation}
+                  />
+                </View>
+
+                <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <Image
+                    source={{
+                      uri: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80",
+                    }}
+                    className="h-[140px] w-full"
+                    resizeMode="cover"
+                  />
+                  <View className="absolute inset-0 bg-white/40 dark:bg-slate-950/40" />
+                  <View className="absolute inset-0 items-center justify-center">
+                    <View className="flex-row items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow dark:bg-slate-900">
+                      <Ionicons
+                        name="location"
+                        size={14}
+                        color={colors.accent}
+                      />
+                      <AppText className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        Hawassa Main Campus
+                      </AppText>
+                    </View>
+                  </View>
+                  <View className="absolute bottom-3 right-3 items-center gap-1 rounded-lg bg-white px-2 py-1 shadow dark:bg-slate-900">
+                    <Ionicons name="add" size={14} color={colors.mutedText} />
+                    <View className="h-px w-4 bg-slate-200 dark:bg-slate-800" />
+                    <Ionicons
+                      name="remove"
+                      size={14}
+                      color={colors.mutedText}
+                    />
+                  </View>
+                </View>
+
+                <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Organizer
+                </AppText>
+                <View className="mt-2 flex-row items-center gap-3">
+                  <View className="h-11 w-11 items-center justify-center rounded-full bg-green-100 dark:bg-green-400/20">
+                    <Ionicons name="person" size={18} color={colors.accent} />
+                  </View>
+                  <View className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <TextInput
+                      placeholder="Club or Individual Name"
+                      placeholderTextColor={colors.mutedStrong}
+                      className="text-sm text-slate-900 dark:text-slate-100"
+                      value={hostName}
+                      onChangeText={setHostName}
+                    />
+                  </View>
+                </View>
+
+                <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Entry Fee
+                </AppText>
+                <View className="mt-2 flex-row rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
+                  <Pressable
+                    onPress={() => setFeeType("free")}
+                    className="flex-1 items-center justify-center rounded-lg py-2.5"
+                    style={{
+                      backgroundColor:
+                        feeType === "free" ? colors.card : "transparent",
+                    }}
+                  >
+                    <AppText
+                      className="text-sm font-semibold"
+                      style={{
+                        color:
+                          feeType === "free" ? colors.accent : colors.mutedText,
+                      }}
+                    >
+                      Free
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setFeeType("paid")}
+                    className="flex-1 items-center justify-center rounded-lg py-2.5"
+                    style={{
+                      backgroundColor:
+                        feeType === "paid" ? colors.card : "transparent",
+                    }}
+                  >
+                    <AppText
+                      className="text-sm font-semibold"
+                      style={{
+                        color:
+                          feeType === "paid" ? colors.accent : colors.mutedText,
+                      }}
+                    >
+                      Paid
+                    </AppText>
+                  </Pressable>
+                </View>
+
+                <View
+                  className="mt-3 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  style={{ display: feeType === "paid" ? "flex" : "none" }}
+                >
+                  <Ionicons
+                    name="cash-outline"
+                    size={18}
+                    color={colors.mutedText}
+                  />
+                  <TextInput
+                    placeholder="Entry fee amount (ETB)"
+                    placeholderTextColor={colors.mutedStrong}
+                    className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                    keyboardType="numeric"
+                    value={feeAmount}
+                    onChangeText={setFeeAmount}
+                  />
+                </View>
+
+                <View className="mt-6 flex-row items-center gap-2">
+                  <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Details
+                  </AppText>
+                  <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                    (optional)
+                  </AppText>
+                </View>
+                <View className="mt-4">
+                  <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Tags
+                  </AppText>
+                  <View className="mt-2 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <Ionicons
+                      name="pricetag-outline"
+                      size={18}
+                      color={colors.mutedText}
+                    />
+                    <TextInput
+                      placeholder="Add tags (comma separated)"
+                      placeholderTextColor={colors.mutedStrong}
+                      className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                      value={tagsText}
+                      onChangeText={setTagsText}
+                    />
+                  </View>
+                </View>
+                <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <TextInput
+                    placeholder="Tell students what this event is about..."
+                    placeholderTextColor={colors.mutedStrong}
+                    className="min-h-[110px] text-sm text-slate-900 dark:text-slate-100"
+                    multiline
+                    textAlignVertical="top"
+                    value={details}
+                    onChangeText={setDetails}
+                  />
+                </View>
+
+                {errorMessage ? (
+                  <AppText className="mt-4 text-sm text-red-500">
+                    {errorMessage}
+                  </AppText>
+                ) : null}
+              </View>
+            </KeyboardAwareScrollView>
+
+            <Modal
+              visible={activePicker !== null}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setActivePicker(null)}
+            >
+              <View className="flex-1 justify-end bg-black/40">
+                <Pressable
+                  className="flex-1"
+                  onPress={() => setActivePicker(null)}
+                />
+                <View className="rounded-t-3xl bg-white px-5 pb-8 pt-4 dark:bg-slate-900">
+                  <View className="mb-3 flex-row items-center justify-between">
+                    <Pressable onPress={() => setActivePicker(null)}>
+                      <AppText className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                        Cancel
+                      </AppText>
+                    </Pressable>
+                    <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {getPickerTitle(activePicker)}
+                    </AppText>
+                    <Pressable onPress={() => setActivePicker(null)}>
+                      <AppText className="text-sm font-semibold text-green-600 dark:text-green-400">
+                        Done
+                      </AppText>
+                    </Pressable>
+                  </View>
+
+                  <DateTimePicker
+                    value={getPickerValue()}
+                    mode={getPickerMode(activePicker)}
+                    display={getPickerDisplay(activePicker)}
+                    onChange={handlePickerChange}
+                  />
+                </View>
+              </View>
+            </Modal>
+
+            <View className="border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
+              <Pressable
+                onPress={handleSubmit}
+                className={`flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 ${
+                  isSubmitting ? "opacity-60" : ""
+                }`}
+                disabled={isSubmitting}
+              >
+                <AppText className="text-sm font-semibold text-white">
+                  {isSubmitting
+                    ? isEditing
+                      ? "Saving..."
+                      : "Posting..."
+                    : isEditing
+                      ? "Save Changes"
+                      : "Post Event"}
+                </AppText>
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              </Pressable>
             </View>
           </View>
-        </Modal>
-
-        <View className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
-          <Pressable
-            onPress={handleSubmit}
-            className={`flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 ${
-              isSubmitting ? "opacity-60" : ""
-            }`}
-            disabled={isSubmitting}
-          >
-            <AppText className="text-sm font-semibold text-white">
-              {isSubmitting
-                ? isEditing
-                  ? "Saving..."
-                  : "Posting..."
-                : isEditing
-                  ? "Save Changes"
-                  : "Post Event"}
-            </AppText>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-          </Pressable>
-        </View>
+        </TouchableWithoutFeedback>
       </View>
     </SafeAreaView>
   );
