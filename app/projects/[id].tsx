@@ -241,7 +241,7 @@ export default function ProjectDetailsScreen() {
             onPress={() => router.back()}
           >
             <Ionicons
-              name="chevron-back"
+              name="arrow-back"
               size={20}
               color={statusBarStyle === "light" ? "#E5E7EB" : "#0F172A"}
             />
@@ -249,7 +249,7 @@ export default function ProjectDetailsScreen() {
           <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
             Project Details
           </AppText>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900"
             accessibilityRole="button"
           >
@@ -258,7 +258,7 @@ export default function ProjectDetailsScreen() {
               size={18}
               color={statusBarStyle === "light" ? "#E5E7EB" : "#0F172A"}
             />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         <ScrollView
