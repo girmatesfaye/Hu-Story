@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
+import { FetchErrorModal } from "../../components/FetchErrorModal";
+import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
 import { useColorScheme } from "react-native";
 import { supabase } from "../../lib/supabase";
@@ -57,44 +58,36 @@ export default function SpotsTabScreen() {
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadSpots = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
 
-    const loadSpots = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
+    let query = supabase
+      .from("spots")
+      .select(
+        "id, name, category, location, rating_avg, review_count, price_type, cover_url",
+      )
+      .order("created_at", { ascending: false });
 
-      let query = supabase
-        .from("spots")
-        .select(
-          "id, name, category, location, rating_avg, review_count, price_type, cover_url",
-        )
-        .order("created_at", { ascending: false });
+    if (activeCategory !== "All") {
+      query = query.eq("category", activeCategory);
+    }
 
-      if (activeCategory !== "All") {
-        query = query.eq("category", activeCategory);
-      }
+    const { data, error } = await query;
 
-      const { data, error } = await query;
+    if (error) {
+      setErrorMessage(error.message);
+      setSpots([]);
+    } else {
+      setSpots((data ?? []) as SpotItem[]);
+    }
 
-      if (!isMounted) return;
-
-      if (error) {
-        setErrorMessage(error.message);
-        setSpots([]);
-      } else {
-        setSpots((data ?? []) as SpotItem[]);
-      }
-
-      setIsLoading(false);
-    };
-
-    loadSpots();
-
-    return () => {
-      isMounted = false;
-    };
+    setIsLoading(false);
   }, [activeCategory]);
+
+  useEffect(() => {
+    void loadSpots();
+  }, [loadSpots]);
 
   const tagToneStyles: Record<string, { container: string; text: string }> = {
     food: { container: "bg-orange-100", text: "text-orange-700" },
@@ -166,77 +159,92 @@ export default function SpotsTabScreen() {
         </ScrollView>
 
         <View className="mt-5 gap-4">
-          {isLoading ? (
-            <AppText className="text-sm text-slate-400 dark:text-slate-500">
-              Loading spots...
-            </AppText>
-          ) : null}
-          {errorMessage ? (
-            <AppText className="text-sm text-red-500">{errorMessage}</AppText>
-          ) : null}
-          {spots.map((spot) => {
-            const tone =
-              tagToneStyles[(spot.category ?? "").toLowerCase()] ??
-              ({ container: "bg-blue-100", text: "text-blue-700" } as const);
-
-            return (
-              <Pressable
-                key={spot.id}
-                onPress={() => router.push(`../spots/${spot.id}`)}
-                className="flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-              >
-                <Image
-                  source={{ uri: spot.cover_url ?? fallbackSpotImage }}
-                  className="h-[90px] w-[90px] rounded-xl"
-                  resizeMode="cover"
-                />
-
-                <View className="flex-1">
-                  <AppText className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">
-                    {spot.name}
-                  </AppText>
-                  <View className="mt-2 flex-row items-center gap-2">
-                    <View
-                      className={`rounded-md px-2 py-0.5 ${tone.container} dark:bg-opacity-20`}
-                    >
-                      <AppText
-                        className={`text-[11px] font-semibold ${tone.text}`}
-                      >
-                        {spot.category ?? "Other"}
-                      </AppText>
+          {isLoading
+            ? Array.from({ length: 4 }).map((_, index) => (
+                <View
+                  key={`spot-skeleton-${index}`}
+                  className="flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <SkeletonBlock className="h-[90px] w-[90px] rounded-xl" />
+                  <View className="flex-1">
+                    <SkeletonBlock className="h-4 w-2/3 rounded-md" />
+                    <View className="mt-2 flex-row items-center gap-2">
+                      <SkeletonBlock className="h-5 w-16 rounded-md" />
+                      <SkeletonBlock className="h-3 w-1/3 rounded-md" />
                     </View>
-                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                      {spot.location ?? "Location TBD"}
-                    </AppText>
-                  </View>
-
-                  <View className="mt-2 flex-row items-center justify-between">
-                    <View className="flex-row items-center gap-1">
-                      <Ionicons name="star" size={14} color="#F59E0B" />
-                      <AppText className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                        {spot.rating_avg.toFixed(1)}
-                      </AppText>
-                      <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                        ({spot.review_count})
-                      </AppText>
+                    <View className="mt-3 flex-row items-center justify-between">
+                      <SkeletonBlock className="h-3 w-24 rounded-md" />
+                      <SkeletonBlock className="h-5 w-14 rounded-md" />
                     </View>
-
-                    {spot.price_type?.toLowerCase() === "free" ? (
-                      <View className="rounded-md bg-green-100 px-2 py-1 dark:bg-green-400/20">
-                        <AppText className="text-xs font-semibold text-green-700 dark:text-green-300">
-                          Free
-                        </AppText>
-                      </View>
-                    ) : (
-                      <AppText className="text-xs font-semibold text-slate-400 dark:text-slate-500">
-                        {spot.price_type ?? "Paid"}
-                      </AppText>
-                    )}
                   </View>
                 </View>
-              </Pressable>
-            );
-          })}
+              ))
+            : spots.map((spot) => {
+                const tone =
+                  tagToneStyles[(spot.category ?? "").toLowerCase()] ??
+                  ({
+                    container: "bg-blue-100",
+                    text: "text-blue-700",
+                  } as const);
+
+                return (
+                  <Pressable
+                    key={spot.id}
+                    onPress={() => router.push(`../spots/${spot.id}`)}
+                    className="flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <Image
+                      source={{ uri: spot.cover_url ?? fallbackSpotImage }}
+                      className="h-[90px] w-[90px] rounded-xl"
+                      resizeMode="cover"
+                    />
+
+                    <View className="flex-1">
+                      <AppText className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">
+                        {spot.name}
+                      </AppText>
+                      <View className="mt-2 flex-row items-center gap-2">
+                        <View
+                          className={`rounded-md px-2 py-0.5 ${tone.container} dark:bg-opacity-20`}
+                        >
+                          <AppText
+                            className={`text-[11px] font-semibold ${tone.text}`}
+                          >
+                            {spot.category ?? "Other"}
+                          </AppText>
+                        </View>
+                        <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                          {spot.location ?? "Location TBD"}
+                        </AppText>
+                      </View>
+
+                      <View className="mt-2 flex-row items-center justify-between">
+                        <View className="flex-row items-center gap-1">
+                          <Ionicons name="star" size={14} color="#F59E0B" />
+                          <AppText className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                            {spot.rating_avg.toFixed(1)}
+                          </AppText>
+                          <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                            ({spot.review_count})
+                          </AppText>
+                        </View>
+
+                        {spot.price_type?.toLowerCase() === "free" ? (
+                          <View className="rounded-md bg-green-100 px-2 py-1 dark:bg-green-400/20">
+                            <AppText className="text-xs font-semibold text-green-700 dark:text-green-300">
+                              Free
+                            </AppText>
+                          </View>
+                        ) : (
+                          <AppText className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                            {spot.price_type ?? "Paid"}
+                          </AppText>
+                        )}
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
         </View>
       </ScrollView>
       {/* Floating Action Button */}
@@ -246,6 +254,13 @@ export default function SpotsTabScreen() {
       >
         <Ionicons name="add" size={26} color={colors.chipActiveText} />
       </Pressable>
+
+      <FetchErrorModal
+        visible={Boolean(errorMessage)}
+        message={errorMessage}
+        onClose={() => setErrorMessage(null)}
+        onRetry={() => void loadSpots()}
+      />
     </View>
   );
 }

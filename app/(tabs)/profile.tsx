@@ -2,6 +2,8 @@ import { Image, Modal, ScrollView, TouchableOpacity, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { AppText } from "../../components/AppText";
+import { FetchErrorModal } from "../../components/FetchErrorModal";
+import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
 import { router } from "expo-router";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -113,6 +115,7 @@ export default function ProfileTabScreen() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -132,6 +135,7 @@ export default function ProfileTabScreen() {
 
     if (error) {
       setProfile(null);
+      setFetchError(error.message);
       return;
     }
 
@@ -146,6 +150,11 @@ export default function ProfileTabScreen() {
         .select("full_name, username, campus, avatar_url, bio")
         .eq("user_id", session.user.id)
         .maybeSingle();
+
+      if (!freshProfile) {
+        setFetchError("Unable to load your profile.");
+      }
+
       setProfile(freshProfile ?? null);
       return;
     }
@@ -160,141 +169,140 @@ export default function ProfileTabScreen() {
     }, [loadProfile]),
   );
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadStats = async () => {
-      if (!session?.user) {
-        if (isMounted) {
-          setStats({ spots: 0, rants: 0, events: 0, projects: 0 });
-        }
-        return;
-      }
-
-      setIsLoadingStats(true);
-
-      const [spotsResult, rantsResult, eventsResult, projectsResult] =
-        await Promise.all([
-          supabase
-            .from("spots")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", session.user.id),
-          supabase
-            .from("rants")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", session.user.id),
-          supabase
-            .from("events")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", session.user.id),
-          supabase
-            .from("projects")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", session.user.id),
-        ]);
-
-      if (!isMounted) return;
-
-      setStats({
-        spots: spotsResult.count ?? 0,
-        rants: rantsResult.count ?? 0,
-        events: eventsResult.count ?? 0,
-        projects: projectsResult.count ?? 0,
-      });
+  const loadStats = useCallback(async () => {
+    if (!session?.user) {
+      setStats({ spots: 0, rants: 0, events: 0, projects: 0 });
       setIsLoadingStats(false);
-    };
+      return;
+    }
 
-    loadStats();
+    setIsLoadingStats(true);
 
-    return () => {
-      isMounted = false;
-    };
+    const [spotsResult, rantsResult, eventsResult, projectsResult] =
+      await Promise.all([
+        supabase
+          .from("spots")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id),
+        supabase
+          .from("rants")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id),
+        supabase
+          .from("events")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id),
+        supabase
+          .from("projects")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id),
+      ]);
+
+    const statsError =
+      spotsResult.error ||
+      rantsResult.error ||
+      eventsResult.error ||
+      projectsResult.error;
+
+    if (statsError) {
+      setFetchError(statsError.message);
+    }
+
+    setStats({
+      spots: spotsResult.count ?? 0,
+      rants: rantsResult.count ?? 0,
+      events: eventsResult.count ?? 0,
+      projects: projectsResult.count ?? 0,
+    });
+    setIsLoadingStats(false);
   }, [session?.user]);
 
   useEffect(() => {
-    let isMounted = true;
+    void loadStats();
+  }, [loadStats]);
 
-    const loadSection = async () => {
-      if (!session?.user) return;
-
-      setIsLoadingList(true);
-      setListError(null);
-
-      if (activeSection === "spots") {
-        const { data, error } = await supabase
-          .from("spots")
-          .select(
-            "id, name, location, cover_url, price_type, rating_avg, review_count",
-          )
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false });
-
-        if (!isMounted) return;
-        if (error) {
-          setListError(error.message);
-          setSpots([]);
-        } else {
-          setSpots((data ?? []) as SpotItem[]);
-        }
-      }
-
-      if (activeSection === "rants") {
-        const { data, error } = await supabase
-          .from("rants")
-          .select("id, content, created_at, category, views, comment_count")
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false });
-
-        if (!isMounted) return;
-        if (error) {
-          setListError(error.message);
-          setRants([]);
-        } else {
-          setRants((data ?? []) as RantItem[]);
-        }
-      }
-
-      if (activeSection === "projects") {
-        const { data, error } = await supabase
-          .from("projects")
-          .select("id, title, summary, created_at, views, likes, cover_url")
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false });
-
-        if (!isMounted) return;
-        if (error) {
-          setListError(error.message);
-          setProjects([]);
-        } else {
-          setProjects((data ?? []) as ProjectItem[]);
-        }
-      }
-
-      if (activeSection === "events") {
-        const { data, error } = await supabase
-          .from("events")
-          .select("id, title, start_at, location, cover_url, attendees_count")
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false });
-
-        if (!isMounted) return;
-        if (error) {
-          setListError(error.message);
-          setEvents([]);
-        } else {
-          setEvents((data ?? []) as EventItem[]);
-        }
-      }
-
+  const loadSection = useCallback(async () => {
+    if (!session?.user) {
       setIsLoadingList(false);
-    };
+      return;
+    }
 
-    loadSection();
+    setIsLoadingList(true);
+    setListError(null);
 
-    return () => {
-      isMounted = false;
-    };
+    if (activeSection === "spots") {
+      const { data, error } = await supabase
+        .from("spots")
+        .select(
+          "id, name, location, cover_url, price_type, rating_avg, review_count",
+        )
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        setFetchError(error.message);
+        setSpots([]);
+      } else {
+        setSpots((data ?? []) as SpotItem[]);
+      }
+    }
+
+    if (activeSection === "rants") {
+      const { data, error } = await supabase
+        .from("rants")
+        .select("id, content, created_at, category, views, comment_count")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        setFetchError(error.message);
+        setRants([]);
+      } else {
+        setRants((data ?? []) as RantItem[]);
+      }
+    }
+
+    if (activeSection === "projects") {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, title, summary, created_at, views, likes, cover_url")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        setFetchError(error.message);
+        setProjects([]);
+      } else {
+        setProjects((data ?? []) as ProjectItem[]);
+      }
+    }
+
+    if (activeSection === "events") {
+      const { data, error } = await supabase
+        .from("events")
+        .select("id, title, start_at, location, cover_url, attendees_count")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        setFetchError(error.message);
+        setEvents([]);
+      } else {
+        setEvents((data ?? []) as EventItem[]);
+      }
+    }
+
+    setIsLoadingList(false);
   }, [session?.user, activeSection]);
+
+  useEffect(() => {
+    void loadSection();
+  }, [loadSection]);
+
+  const handleRetryData = useCallback(async () => {
+    setFetchError(null);
+    await Promise.all([loadProfile(), loadStats(), loadSection()]);
+  }, [loadProfile, loadSection, loadStats]);
 
   const handleDelete = async () => {
     if (!deleteTarget || !session?.user) return;
@@ -497,33 +505,49 @@ export default function ProfileTabScreen() {
         <View className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-800">
           <View className="flex-row items-center justify-around">
             <View className="items-center">
-              <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {isLoadingStats ? "-" : stats.spots}
-              </AppText>
+              {isLoadingStats ? (
+                <SkeletonBlock className="h-6 w-10 rounded-md" />
+              ) : (
+                <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {stats.spots}
+                </AppText>
+              )}
               <AppText className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 SPOTS
               </AppText>
             </View>
             <View className="items-center">
-              <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {isLoadingStats ? "-" : stats.rants}
-              </AppText>
+              {isLoadingStats ? (
+                <SkeletonBlock className="h-6 w-10 rounded-md" />
+              ) : (
+                <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {stats.rants}
+                </AppText>
+              )}
               <AppText className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 RANTS
               </AppText>
             </View>
             <View className="items-center">
-              <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {isLoadingStats ? "-" : stats.events}
-              </AppText>
+              {isLoadingStats ? (
+                <SkeletonBlock className="h-6 w-10 rounded-md" />
+              ) : (
+                <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {stats.events}
+                </AppText>
+              )}
               <AppText className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 EVENTS
               </AppText>
             </View>
             <View className="items-center">
-              <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {isLoadingStats ? "-" : stats.projects}
-              </AppText>
+              {isLoadingStats ? (
+                <SkeletonBlock className="h-6 w-10 rounded-md" />
+              ) : (
+                <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {stats.projects}
+                </AppText>
+              )}
               <AppText className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 PROJECTS
               </AppText>
@@ -605,16 +629,73 @@ export default function ProfileTabScreen() {
         </View>
 
         <View className="mt-6 gap-4">
-          {isLoadingList ? (
-            <AppText className="text-sm text-slate-400 dark:text-slate-500">
-              Loading your content...
-            </AppText>
-          ) : null}
-          {listError ? (
-            <AppText className="text-sm text-red-500">{listError}</AppText>
-          ) : null}
+          {isLoadingList && activeSection === "spots"
+            ? Array.from({ length: 3 }).map((_, index) => (
+                <View
+                  key={`profile-spots-skeleton-${index}`}
+                  className="flex-row items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <SkeletonBlock className="h-16 w-16 rounded-xl" />
+                  <View className="flex-1 gap-2">
+                    <SkeletonBlock className="h-4 w-2/3 rounded-md" />
+                    <SkeletonBlock className="h-3 w-1/2 rounded-md" />
+                    <SkeletonBlock className="h-3 w-1/3 rounded-md" />
+                  </View>
+                </View>
+              ))
+            : null}
 
-          {activeSection === "spots"
+          {isLoadingList && activeSection === "rants"
+            ? Array.from({ length: 3 }).map((_, index) => (
+                <View
+                  key={`profile-rants-skeleton-${index}`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <SkeletonBlock className="h-4 w-20 rounded-md" />
+                  <View className="mt-3 gap-2">
+                    <SkeletonBlock className="h-3 w-full rounded-md" />
+                    <SkeletonBlock className="h-3 w-5/6 rounded-md" />
+                  </View>
+                  <SkeletonBlock className="mt-3 h-3 w-24 rounded-md" />
+                </View>
+              ))
+            : null}
+
+          {isLoadingList && activeSection === "events"
+            ? Array.from({ length: 3 }).map((_, index) => (
+                <View
+                  key={`profile-events-skeleton-${index}`}
+                  className="flex-row items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <SkeletonBlock className="h-16 w-16 rounded-xl" />
+                  <View className="flex-1 gap-2">
+                    <SkeletonBlock className="h-4 w-2/3 rounded-md" />
+                    <SkeletonBlock className="h-3 w-1/2 rounded-md" />
+                    <SkeletonBlock className="h-3 w-1/3 rounded-md" />
+                  </View>
+                </View>
+              ))
+            : null}
+
+          {isLoadingList && activeSection === "projects"
+            ? Array.from({ length: 3 }).map((_, index) => (
+                <View
+                  key={`profile-projects-skeleton-${index}`}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <View className="flex-row items-start gap-4">
+                    <SkeletonBlock className="h-16 w-16 rounded-xl" />
+                    <View className="flex-1 gap-2">
+                      <SkeletonBlock className="h-4 w-2/3 rounded-md" />
+                      <SkeletonBlock className="h-3 w-5/6 rounded-md" />
+                      <SkeletonBlock className="h-3 w-2/3 rounded-md" />
+                    </View>
+                  </View>
+                </View>
+              ))
+            : null}
+
+          {!isLoadingList && activeSection === "spots"
             ? spots.map((spot) => (
                 <View
                   key={spot.id}
@@ -696,7 +777,7 @@ export default function ProfileTabScreen() {
               ))
             : null}
 
-          {activeSection === "rants"
+          {!isLoadingList && activeSection === "rants"
             ? rants.map((rant) => (
                 <View
                   key={rant.id}
@@ -769,7 +850,7 @@ export default function ProfileTabScreen() {
               ))
             : null}
 
-          {activeSection === "events"
+          {!isLoadingList && activeSection === "events"
             ? events.map((event) => (
                 <View
                   key={event.id}
@@ -849,7 +930,7 @@ export default function ProfileTabScreen() {
               ))
             : null}
 
-          {activeSection === "projects"
+          {!isLoadingList && activeSection === "projects"
             ? projects.map((project) => (
                 <View
                   key={project.id}
@@ -985,6 +1066,13 @@ export default function ProfileTabScreen() {
           </View>
         </View>
       </Modal>
+
+      <FetchErrorModal
+        visible={Boolean(fetchError)}
+        message={fetchError}
+        onClose={() => setFetchError(null)}
+        onRetry={() => void handleRetryData()}
+      />
     </View>
   );
 }
