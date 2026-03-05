@@ -101,7 +101,7 @@ export default function ProjectsTabScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"recent" | "views" | "likes">("recent");
   const [showSort, setShowSort] = useState(false);
-  const [lastVisibleIndex, setLastVisibleIndex] = useState(-1);
+  const [highestSeenIndex, setHighestSeenIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<ProjectItem>>(null);
   const projectsLengthRef = useRef(0);
@@ -197,11 +197,11 @@ export default function ProjectsTabScreen() {
   useEffect(() => {
     projectsLengthRef.current = projects.length;
     const nextUnread =
-      lastVisibleIndex >= 0
-        ? Math.max(projects.length - lastVisibleIndex - 1, 0)
+      highestSeenIndex >= 0
+        ? Math.max(projects.length - highestSeenIndex - 1, 0)
         : 0;
     setUnreadCount(nextUnread);
-  }, [lastVisibleIndex, projects.length]);
+  }, [highestSeenIndex, projects.length]);
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 60,
@@ -215,18 +215,26 @@ export default function ProjectsTabScreen() {
 
       if (indexes.length === 0) return;
 
-      const nextLastVisibleIndex = Math.max(...indexes);
-      setLastVisibleIndex(nextLastVisibleIndex);
-      setUnreadCount(
-        Math.max(projectsLengthRef.current - nextLastVisibleIndex - 1, 0),
-      );
+      const nextVisibleMaxIndex = Math.max(...indexes);
+      setHighestSeenIndex((previousHighestSeenIndex) => {
+        const nextHighestSeenIndex = Math.max(
+          previousHighestSeenIndex,
+          nextVisibleMaxIndex,
+        );
+        const nextUnread = Math.max(
+          projectsLengthRef.current - nextHighestSeenIndex - 1,
+          0,
+        );
+        setUnreadCount(nextUnread);
+        return nextHighestSeenIndex;
+      });
     },
   );
 
   const handleJumpToFirstUnread = useCallback(() => {
     if (!flatListRef.current || unreadCount <= 0) return;
 
-    const targetIndex = Math.min(lastVisibleIndex + 1, projects.length - 1);
+    const targetIndex = Math.min(highestSeenIndex + 1, projects.length - 1);
     if (targetIndex < 0) return;
 
     flatListRef.current.scrollToIndex({
@@ -234,7 +242,7 @@ export default function ProjectsTabScreen() {
       animated: true,
       viewPosition: 0.1,
     });
-  }, [lastVisibleIndex, projects.length, unreadCount]);
+  }, [highestSeenIndex, projects.length, unreadCount]);
 
   const handleToggleLike = async (projectId: string) => {
     if (!session?.user?.id) {

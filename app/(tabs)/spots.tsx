@@ -59,7 +59,7 @@ export default function SpotsTabScreen() {
   const [spots, setSpots] = useState<SpotItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lastVisibleIndex, setLastVisibleIndex] = useState(-1);
+  const [highestSeenIndex, setHighestSeenIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<SpotItem>>(null);
   const spotsLengthRef = useRef(0);
@@ -104,11 +104,11 @@ export default function SpotsTabScreen() {
   useEffect(() => {
     spotsLengthRef.current = spots.length;
     const nextUnread =
-      lastVisibleIndex >= 0
-        ? Math.max(spots.length - lastVisibleIndex - 1, 0)
+      highestSeenIndex >= 0
+        ? Math.max(spots.length - highestSeenIndex - 1, 0)
         : 0;
     setUnreadCount(nextUnread);
-  }, [lastVisibleIndex, spots.length]);
+  }, [highestSeenIndex, spots.length]);
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 60,
@@ -122,18 +122,26 @@ export default function SpotsTabScreen() {
 
       if (indexes.length === 0) return;
 
-      const nextLastVisibleIndex = Math.max(...indexes);
-      setLastVisibleIndex(nextLastVisibleIndex);
-      setUnreadCount(
-        Math.max(spotsLengthRef.current - nextLastVisibleIndex - 1, 0),
-      );
+      const nextVisibleMaxIndex = Math.max(...indexes);
+      setHighestSeenIndex((previousHighestSeenIndex) => {
+        const nextHighestSeenIndex = Math.max(
+          previousHighestSeenIndex,
+          nextVisibleMaxIndex,
+        );
+        const nextUnread = Math.max(
+          spotsLengthRef.current - nextHighestSeenIndex - 1,
+          0,
+        );
+        setUnreadCount(nextUnread);
+        return nextHighestSeenIndex;
+      });
     },
   );
 
   const handleJumpToFirstUnread = useCallback(() => {
     if (!flatListRef.current || unreadCount <= 0) return;
 
-    const targetIndex = Math.min(lastVisibleIndex + 1, spots.length - 1);
+    const targetIndex = Math.min(highestSeenIndex + 1, spots.length - 1);
     if (targetIndex < 0) return;
 
     flatListRef.current.scrollToIndex({
@@ -141,7 +149,7 @@ export default function SpotsTabScreen() {
       animated: true,
       viewPosition: 0.1,
     });
-  }, [lastVisibleIndex, spots.length, unreadCount]);
+  }, [highestSeenIndex, spots.length, unreadCount]);
 
   const tagToneStyles: Record<string, { container: string; text: string }> = {
     food: { container: "bg-orange-100", text: "text-orange-700" },
