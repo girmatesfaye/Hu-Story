@@ -18,8 +18,18 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-
-const categories = ["Cafe", "Library", "Hangout", "Study", "Food", "Other"];
+const categories = [
+  "All",
+  "Food",
+  "Hangout",
+  "Game",
+  "Study",
+  "Date Spots",
+  "Quiet Areas",
+  "Outdoor",
+  "Cheap Eats",
+  "Other",
+];
 
 export default function CreateSpotScreen() {
   const router = useRouter();
@@ -200,12 +210,8 @@ export default function CreateSpotScreen() {
             onPress={() => router.back()}
             className="flex-row items-center"
           >
-            <Feather name="x" size={20} color={colors.mutedText} />
-            <AppText className="ml-2 text-base text-slate-500 dark:text-slate-300">
-              Cancel
-            </AppText>
+            <Feather name="arrow-left" size={24} color={colors.text} />
           </Pressable>
-
           <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             Add New Spot
           </AppText>

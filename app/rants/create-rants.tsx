@@ -7,10 +7,21 @@ import Feather from "@expo/vector-icons/Feather";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
-const categories = ["Campus Life", "Cafeteria", "Academics", "Dorms", "Spots"];
-
+const categories = [
+  "Campus Life",
+  "Cafeteria",
+  "Academics",
+  "Dorms",
+  "Relationships",
+  "Sexual",
+  "Mental",
+  "Family",
+  "Other",
+];
+import { useTheme } from "../../hooks/useTheme";
 export default function CreateRantScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const { session } = useSupabase();
   const [activeCategory, setActiveCategory] = useState(categories[0]);
   const [text, setText] = useState("");
@@ -56,11 +67,11 @@ export default function CreateRantScreen() {
           onPress={() => router.back()}
           className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
         >
-          <Feather name="arrow-left" size={24} color="black" />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </Pressable>
 
         <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Rew Rants
+          Create Rant
         </AppText>
         <View className="w-14" />
       </View>
@@ -156,10 +167,10 @@ export default function CreateRantScreen() {
           disabled={isSubmitting}
         >
           <View className="flex-row items-center gap-2">
-            <AppText className="text-base font-semibold text-white dark:text-slate-950">
+            <AppText className="text-base font-semibold text-white text-white">
               {isSubmitting ? "Posting..." : "Post Rant"}
             </AppText>
-            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
           </View>
         </Pressable>
       </View>
