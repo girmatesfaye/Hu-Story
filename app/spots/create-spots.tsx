@@ -13,7 +13,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Feather from "@expo/vector-icons/Feather";
 import { AppText } from "../../components/AppText";
+import { TopToast } from "../../components/TopToast";
 import { useTheme } from "../../hooks/useTheme";
+import { useTopToast } from "../../hooks/useTopToast";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
@@ -52,12 +54,12 @@ export default function CreateSpotScreen() {
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { toast, showToast } = useTopToast();
 
   const handlePickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      setErrorMessage("Permission needed to select images.");
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
@@ -109,7 +111,7 @@ export default function CreateSpotScreen() {
           .upload(filePath, fileData, { contentType, upsert: false });
 
         if (uploadError) {
-          setErrorMessage(uploadError.message);
+          showToast("Something went wrong. Please try again.", "error");
           return null;
         }
 
@@ -127,17 +129,17 @@ export default function CreateSpotScreen() {
 
   const handleSubmit = async () => {
     if (!session?.user) {
-      setErrorMessage("Please log in to submit a spot.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     if (!name.trim()) {
-      setErrorMessage("Add a name for the spot.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     if (feeType === "paid" && !priceAmount.trim()) {
-      setErrorMessage("Enter the price for this spot.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
@@ -146,12 +148,11 @@ export default function CreateSpotScreen() {
       feeType === "paid" &&
       (parsedPrice === null || Number.isNaN(parsedPrice))
     ) {
-      setErrorMessage("Price must be a number.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
 
     const uploadedUrls = await uploadSpotImages();
     if (!uploadedUrls) {
@@ -177,7 +178,7 @@ export default function CreateSpotScreen() {
 
     if (spotError || !spotRow) {
       setIsSubmitting(false);
-      setErrorMessage(spotError?.message ?? "Unable to create spot.");
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
@@ -193,18 +194,25 @@ export default function CreateSpotScreen() {
         .from("spot_images")
         .insert(rows);
       if (imagesError) {
-        setErrorMessage(imagesError.message);
+        showToast("Something went wrong. Please try again.", "error");
       }
     }
 
     setIsSubmitting(false);
-
-    router.replace("/(tabs)/spots");
+    showToast("Successfully created.", "success");
+    setTimeout(() => {
+      router.replace("/(tabs)/spots");
+    }, 700);
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1 bg-white dark:bg-slate-950">
+        <TopToast
+          visible={toast.visible}
+          message={toast.message}
+          variant={toast.variant}
+        />
         <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <Pressable
             onPress={() => router.back()}
@@ -433,12 +441,6 @@ export default function CreateSpotScreen() {
                 }}
               />
             </View>
-
-            {errorMessage ? (
-              <AppText className="mt-4 text-sm text-red-500">
-                {errorMessage}
-              </AppText>
-            ) : null}
           </View>
         </KeyboardAwareScrollView>
 

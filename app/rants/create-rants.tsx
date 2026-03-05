@@ -3,8 +3,10 @@ import { Pressable, ScrollView, Switch, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "../../components/AppText";
+import { TopToast } from "../../components/TopToast";
 import Feather from "@expo/vector-icons/Feather";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTopToast } from "../../hooks/useTopToast";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 const categories = [
@@ -27,21 +29,20 @@ export default function CreateRantScreen() {
   const [text, setText] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { toast, showToast } = useTopToast();
 
   const handleSubmit = async () => {
     if (!session?.user) {
-      setErrorMessage("Please log in to post a rant.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     if (!text.trim()) {
-      setErrorMessage("Write something before posting.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
 
     const { error } = await supabase.from("rants").insert({
       user_id: session.user.id,
@@ -53,15 +54,23 @@ export default function CreateRantScreen() {
     setIsSubmitting(false);
 
     if (error) {
-      setErrorMessage(error.message);
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
-    router.replace("/(tabs)/rants");
+    showToast("Successfully created.", "success");
+    setTimeout(() => {
+      router.replace("/(tabs)/rants");
+    }, 700);
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
+      <TopToast
+        visible={toast.visible}
+        message={toast.message}
+        variant={toast.variant}
+      />
       <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
         <Pressable
           onPress={() => router.back()}
@@ -150,12 +159,6 @@ export default function CreateRantScreen() {
             thumbColor="#FFFFFF"
           />
         </View>
-
-        {errorMessage ? (
-          <AppText className="mt-4 text-sm text-red-500">
-            {errorMessage}
-          </AppText>
-        ) : null}
       </ScrollView>
 
       <View className="px-5 pb-6">

@@ -10,7 +10,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { AppText } from "../../components/AppText";
+import { TopToast } from "../../components/TopToast";
 import { useTheme } from "../../hooks/useTheme";
+import { useTopToast } from "../../hooks/useTopToast";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
@@ -28,8 +30,7 @@ export default function EditProfileScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const { toast, showToast } = useTopToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -65,14 +66,13 @@ export default function EditProfileScreen() {
 
   const handlePickAvatar = async () => {
     if (!session?.user) {
-      setErrorMessage("You are not signed in.");
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
-    setErrorMessage(null);
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      setErrorMessage("Permission needed to select a profile photo.");
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
@@ -105,7 +105,7 @@ export default function EditProfileScreen() {
         .upload(filePath, fileData, { contentType, upsert: false });
 
       if (uploadError) {
-        setErrorMessage(uploadError.message);
+        showToast("Something went wrong. Please try again.", "error");
         return null;
       }
 
@@ -118,13 +118,16 @@ export default function EditProfileScreen() {
 
   const handleSave = async () => {
     if (!session?.user) {
-      setErrorMessage("You are not signed in.");
+      showToast("Something went wrong. Please try again.", "error");
+      return;
+    }
+
+    if (!fullName.trim() || !username.trim()) {
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     setIsSaving(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
 
     const nextAvatarUrl = avatarUri ? await uploadAvatar() : avatarUrl;
     if (avatarUri && !nextAvatarUrl) {
@@ -147,17 +150,24 @@ export default function EditProfileScreen() {
     setIsSaving(false);
 
     if (error) {
-      setErrorMessage(error.message);
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
-    setSuccessMessage("Profile updated.");
-    router.back();
+    showToast("Successfully updated.", "success");
+    setTimeout(() => {
+      router.back();
+    }, 700);
   };
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
       <View className="flex-1 bg-slate-50 dark:bg-slate-950">
+        <TopToast
+          visible={toast.visible}
+          message={toast.message}
+          variant={toast.variant}
+        />
         <StatusBar style={statusBarStyle} />
         <View className="flex-row items-center justify-between px-5 pb-3 pt-6">
           <TouchableOpacity
@@ -223,6 +233,8 @@ export default function EditProfileScreen() {
               <TextInput
                 value={fullName}
                 onChangeText={setFullName}
+                placeholder="Full name"
+                placeholderTextColor={colors.mutedStrong}
                 className="text-sm text-slate-900 dark:text-slate-100"
               />
             </View>
@@ -236,6 +248,8 @@ export default function EditProfileScreen() {
               <TextInput
                 value={username}
                 onChangeText={setUsername}
+                placeholder="Username"
+                placeholderTextColor={colors.mutedStrong}
                 className="text-sm text-slate-900 dark:text-slate-100"
               />
             </View>
@@ -276,17 +290,6 @@ export default function EditProfileScreen() {
               Campus is verified based on your student email.
             </AppText>
           </View>
-
-          {errorMessage ? (
-            <AppText className="mt-4 text-sm text-red-500">
-              {errorMessage}
-            </AppText>
-          ) : null}
-          {successMessage ? (
-            <AppText className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">
-              {successMessage}
-            </AppText>
-          ) : null}
 
           <TouchableOpacity
             className="mt-8 flex-row items-center justify-between border-t border-slate-200 py-4 dark:border-slate-800"
