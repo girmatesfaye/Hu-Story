@@ -173,6 +173,7 @@ export default function AddReviewScreen() {
           >
             <AppText className="text-base font-semibold text-white">
               {isSubmitting ? "Posting..." : "Post Review"}
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
             </AppText>
           </TouchableOpacity>
         </View>
