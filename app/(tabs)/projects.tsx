@@ -3,6 +3,8 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
+import { FetchErrorModal } from "../../components/FetchErrorModal";
+import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
 import { Pressable } from "react-native";
 import { useColorScheme } from "react-native";
@@ -50,6 +52,38 @@ const formatTimeAgo = (dateString: string) => {
   return `${days}d ago`;
 };
 
+function ProjectCardSkeleton() {
+  return (
+    <View className="mt-6 rounded-3xl bg-white p-4 dark:bg-slate-900">
+      <SkeletonBlock className="h-44 w-full rounded-2xl" />
+      <View className="mt-4">
+        <View className="flex-row items-center justify-between">
+          <SkeletonBlock className="h-5 w-1/2 rounded-md" />
+          <SkeletonBlock className="h-3 w-16 rounded-md" />
+        </View>
+        <View className="mt-3 gap-2">
+          <SkeletonBlock className="h-3 w-full rounded-md" />
+          <SkeletonBlock className="h-3 w-5/6 rounded-md" />
+        </View>
+        <View className="mt-4 flex-row gap-2">
+          <SkeletonBlock className="h-6 w-16 rounded-lg" />
+          <SkeletonBlock className="h-6 w-20 rounded-lg" />
+        </View>
+        <View className="mt-4 flex-row items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+          <View className="flex-row items-center gap-3">
+            <SkeletonBlock className="h-9 w-9 rounded-full" />
+            <SkeletonBlock className="h-3 w-28 rounded-md" />
+          </View>
+          <View className="flex-row gap-4">
+            <SkeletonBlock className="h-3 w-10 rounded-md" />
+            <SkeletonBlock className="h-3 w-10 rounded-md" />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function ProjectsTabScreen() {
   const { statusBarStyle } = useTheme();
   const { session } = useSupabase();
@@ -69,7 +103,6 @@ export default function ProjectsTabScreen() {
   };
 
   const loadProjects = useCallback(async () => {
-    let isMounted = true;
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -87,8 +120,6 @@ export default function ProjectsTabScreen() {
           : query.order("created_at", { ascending: false });
 
     const { data, error } = await query;
-
-    if (!isMounted) return;
 
     if (error) {
       setErrorMessage(error.message);
@@ -139,10 +170,6 @@ export default function ProjectsTabScreen() {
     }
 
     setIsLoading(false);
-
-    return () => {
-      isMounted = false;
-    };
   }, [session?.user?.id, sortBy]);
 
   useEffect(() => {
@@ -250,7 +277,7 @@ export default function ProjectsTabScreen() {
               }}
               className={`rounded-full px-4 py-2 ${
                 sortBy === "recent"
-                  ? "bg-emerald-600"
+                  ? "bg-green-600"
                   : "bg-slate-100 dark:bg-slate-900"
               }`}
             >
@@ -271,7 +298,7 @@ export default function ProjectsTabScreen() {
               }}
               className={`rounded-full px-4 py-2 ${
                 sortBy === "views"
-                  ? "bg-emerald-600"
+                  ? "bg-green-600"
                   : "bg-slate-100 dark:bg-slate-900"
               }`}
             >
@@ -292,7 +319,7 @@ export default function ProjectsTabScreen() {
               }}
               className={`rounded-full px-4 py-2 ${
                 sortBy === "likes"
-                  ? "bg-emerald-600"
+                  ? "bg-green-600"
                   : "bg-slate-100 dark:bg-slate-900"
               }`}
             >
@@ -309,112 +336,108 @@ export default function ProjectsTabScreen() {
           </View>
         ) : null}
 
-        {isLoading ? (
-          <AppText className="mt-6 text-sm text-slate-400 dark:text-slate-500">
-            Loading projects...
-          </AppText>
-        ) : null}
-        {errorMessage ? (
-          <AppText className="mt-6 text-sm text-red-500">
-            {errorMessage}
-          </AppText>
-        ) : null}
-        {projects.map((project) => (
-          <Pressable
-            key={project.id}
-            className="mt-6 rounded-3xl bg-white shadow-sm dark:bg-slate-900"
-            accessibilityRole="button"
-            onPress={() => router.push(`../projects/${project.id}`)}
-          >
-            {project.cover_url ? (
-              <Image
-                source={{ uri: project.cover_url }}
-                className="h-44 w-full rounded-t-3xl"
-                resizeMode="cover"
-              />
-            ) : (
-              <View className="h-44 rounded-t-3xl bg-emerald-50 dark:bg-emerald-900/30" />
-            )}
-            <View className="px-5 pb-5 pt-4">
-              <View className="flex-row items-center justify-between">
-                <AppText className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                  {project.title}
-                </AppText>
-                <AppText className="text-sm text-slate-400 dark:text-slate-500">
-                  {formatTimeAgo(project.created_at)}
-                </AppText>
-              </View>
-              <AppText className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                {project.summary ?? "No summary yet."}
-              </AppText>
-              <View className="mt-4 flex-row flex-wrap gap-2">
-                {(project.tags ?? []).slice(0, 3).map((tag) => (
-                  <View
-                    key={tag}
-                    className="rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-500/20"
-                  >
-                    <AppText className="text-xs font-medium text-emerald-700 dark:text-emerald-200">
-                      {tag}
+        {isLoading
+          ? Array.from({ length: 3 }).map((_, index) => (
+              <ProjectCardSkeleton key={`project-skeleton-${index}`} />
+            ))
+          : projects.map((project) => (
+              <Pressable
+                key={project.id}
+                className="mt-6 rounded-3xl bg-white shadow-sm dark:bg-slate-900"
+                accessibilityRole="button"
+                onPress={() => router.push(`../projects/${project.id}`)}
+              >
+                {project.cover_url ? (
+                  <Image
+                    source={{ uri: project.cover_url }}
+                    className="h-44 w-full rounded-t-3xl"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View className="h-44 rounded-t-3xl bg-emerald-50 dark:bg-emerald-900/30" />
+                )}
+                <View className="px-5 pb-5 pt-4">
+                  <View className="flex-row items-center justify-between">
+                    <AppText className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                      {project.title}
+                    </AppText>
+                    <AppText className="text-sm text-slate-400 dark:text-slate-500">
+                      {formatTimeAgo(project.created_at)}
                     </AppText>
                   </View>
-                ))}
-              </View>
-              <View className="mt-4 flex-row items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
-                <View className="flex-row items-center">
-                  <View className="h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-emerald-200 dark:bg-emerald-700">
-                    <Image
-                      source={{
-                        uri: project.is_anonymous
-                          ? "https://placehold.co/40x40/png"
-                          : (project.profile?.avatar_url ?? fallbackAvatar),
-                      }}
-                      className="h-full w-full"
-                      resizeMode="cover"
-                    />
-                  </View>
-                  <AppText className="ml-3 text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {project.is_anonymous
-                      ? "Anonymous Student"
-                      : project.profile?.full_name ||
-                        project.profile?.username ||
-                        "Student"}
+                  <AppText className="mt-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                    {project.summary ?? "No summary yet."}
                   </AppText>
-                </View>
-                <View className="flex-row items-center gap-4">
-                  <View className="flex-row items-center">
-                    <Ionicons
-                      name="eye-outline"
-                      size={18}
-                      color={statusBarStyle === "light" ? "#94A3B8" : "#64748B"}
-                    />
-                    <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
-                      {project.views}
-                    </AppText>
+                  <View className="mt-4 flex-row flex-wrap gap-2">
+                    {(project.tags ?? []).slice(0, 3).map((tag) => (
+                      <View
+                        key={tag}
+                        className="rounded-lg bg-green-100 px-3 py-1 dark:bg-green-500/20"
+                      >
+                        <AppText className="text-xs font-medium text-green-700 dark:text-green-200">
+                          {tag}
+                        </AppText>
+                      </View>
+                    ))}
                   </View>
-                  <Pressable
-                    onPress={() => handleToggleLike(project.id)}
-                    className="flex-row items-center"
-                  >
-                    <Ionicons
-                      name={project.is_liked ? "heart" : "heart-outline"}
-                      size={18}
-                      color={
-                        project.is_liked
-                          ? iconColors.danger
-                          : statusBarStyle === "light"
-                            ? "#94A3B8"
-                            : "#64748B"
-                      }
-                    />
-                    <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
-                      {project.likes}
-                    </AppText>
-                  </Pressable>
+                  <View className="mt-4 flex-row items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+                    <View className="flex-row items-center">
+                      <View className="h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-green-200 dark:bg-green-700">
+                        <Image
+                          source={{
+                            uri: project.is_anonymous
+                              ? "https://placehold.co/40x40/png"
+                              : (project.profile?.avatar_url ?? fallbackAvatar),
+                          }}
+                          className="h-full w-full"
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <AppText className="ml-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+                        {project.is_anonymous
+                          ? "Anonymous Student"
+                          : project.profile?.full_name ||
+                            project.profile?.username ||
+                            "Student"}
+                      </AppText>
+                    </View>
+                    <View className="flex-row items-center gap-4">
+                      <View className="flex-row items-center">
+                        <Ionicons
+                          name="eye-outline"
+                          size={18}
+                          color={
+                            statusBarStyle === "light" ? "#94A3B8" : "#64748B"
+                          }
+                        />
+                        <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
+                          {project.views}
+                        </AppText>
+                      </View>
+                      <Pressable
+                        onPress={() => handleToggleLike(project.id)}
+                        className="flex-row items-center"
+                      >
+                        <Ionicons
+                          name={project.is_liked ? "heart" : "heart-outline"}
+                          size={18}
+                          color={
+                            project.is_liked
+                              ? iconColors.danger
+                              : statusBarStyle === "light"
+                                ? "#94A3B8"
+                                : "#64748B"
+                          }
+                        />
+                        <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
+                          {project.likes}
+                        </AppText>
+                      </Pressable>
+                    </View>
+                  </View>
                 </View>
-              </View>
-            </View>
-          </Pressable>
-        ))}
+              </Pressable>
+            ))}
       </ScrollView>
 
       {/* FAB */}
@@ -424,6 +447,13 @@ export default function ProjectsTabScreen() {
       >
         <Ionicons name="add" size={26} color={iconColors.chipText} />
       </Pressable>
+
+      <FetchErrorModal
+        visible={Boolean(errorMessage)}
+        message={errorMessage}
+        onClose={() => setErrorMessage(null)}
+        onRetry={() => void loadProjects()}
+      />
     </View>
   );
 }

@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
+import { FetchErrorModal } from "../../components/FetchErrorModal";
+import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
 import { useColorScheme } from "react-native";
 import { supabase } from "../../lib/supabase";
@@ -180,6 +181,25 @@ function EventCard({
   );
 }
 
+function EventCardSkeleton() {
+  return (
+    <View className="flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+      <SkeletonBlock className="h-[86px] w-[86px] rounded-xl" />
+      <View className="flex-1">
+        <SkeletonBlock className="h-4 w-2/3 rounded-md" />
+        <View className="mt-3 gap-2">
+          <SkeletonBlock className="h-3 w-1/2 rounded-md" />
+          <SkeletonBlock className="h-3 w-3/5 rounded-md" />
+        </View>
+        <View className="mt-3 flex-row items-center justify-between">
+          <SkeletonBlock className="h-6 w-16 rounded-md" />
+          <SkeletonBlock className="h-3 w-20 rounded-md" />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function EventTabScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -199,38 +219,30 @@ export default function EventTabScreen() {
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadEvents = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
 
-    const loadEvents = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
+    const { data, error } = await supabase
+      .from("events")
+      .select(
+        "id, title, start_at, end_at, location, cover_url, fee_type, fee_amount, host_name",
+      )
+      .order("start_at", { ascending: true });
 
-      const { data, error } = await supabase
-        .from("events")
-        .select(
-          "id, title, start_at, end_at, location, cover_url, fee_type, fee_amount, host_name",
-        )
-        .order("start_at", { ascending: true });
+    if (error) {
+      setErrorMessage(error.message);
+      setEvents([]);
+    } else {
+      setEvents((data ?? []) as EventItem[]);
+    }
 
-      if (!isMounted) return;
-
-      if (error) {
-        setErrorMessage(error.message);
-        setEvents([]);
-      } else {
-        setEvents((data ?? []) as EventItem[]);
-      }
-
-      setIsLoading(false);
-    };
-
-    loadEvents();
-
-    return () => {
-      isMounted = false;
-    };
+    setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    void loadEvents();
+  }, [loadEvents]);
 
   const dateChips = useMemo(() => buildDateChips(6), []);
 
@@ -382,63 +394,63 @@ export default function EventTabScreen() {
         </View>
 
         <View className="mt-3 gap-4">
-          {isLoading ? (
-            <AppText className="text-sm text-slate-400 dark:text-slate-500">
-              Loading events...
-            </AppText>
-          ) : null}
-          {errorMessage ? (
-            <AppText className="text-sm text-red-500">{errorMessage}</AppText>
-          ) : null}
-          {todayEvents.map((event) => (
-            <EventCard
-              key={event.id}
-              title={event.title}
-              time={formatEventDateRange(event.start_at, event.end_at)}
-              location={event.location ?? "Location TBD"}
-              price={
-                event.fee_type?.toLowerCase() === "paid"
-                  ? event.fee_amount
-                    ? `${event.fee_amount} ETB`
-                    : "Paid"
-                  : "Free"
-              }
-              image={
-                resolveEventCoverUrl(event.cover_url) ?? fallbackEventImage
-              }
-              badge="Today"
-              host={event.host_name ? `By ${event.host_name}` : undefined}
-              iconColor={iconColor}
-              onPress={() => router.push(`../events/${event.id}`)}
-            />
-          ))}
+          {isLoading
+            ? Array.from({ length: 2 }).map((_, index) => (
+                <EventCardSkeleton key={`today-skeleton-${index}`} />
+              ))
+            : todayEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  title={event.title}
+                  time={formatEventDateRange(event.start_at, event.end_at)}
+                  location={event.location ?? "Location TBD"}
+                  price={
+                    event.fee_type?.toLowerCase() === "paid"
+                      ? event.fee_amount
+                        ? `${event.fee_amount} ETB`
+                        : "Paid"
+                      : "Free"
+                  }
+                  image={
+                    resolveEventCoverUrl(event.cover_url) ?? fallbackEventImage
+                  }
+                  badge="Today"
+                  host={event.host_name ? `By ${event.host_name}` : undefined}
+                  iconColor={iconColor}
+                  onPress={() => router.push(`../events/${event.id}`)}
+                />
+              ))}
         </View>
 
         <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
           Next Week
         </AppText>
         <View className="mt-3 gap-4">
-          {nextWeekEvents.map((event) => (
-            <EventCard
-              key={event.id}
-              title={event.title}
-              time={formatEventDateRange(event.start_at, event.end_at)}
-              location={event.location ?? "Location TBD"}
-              price={
-                event.fee_type?.toLowerCase() === "paid"
-                  ? event.fee_amount
-                    ? `${event.fee_amount} ETB`
-                    : "Paid"
-                  : "Free"
-              }
-              image={
-                resolveEventCoverUrl(event.cover_url) ?? fallbackEventImage
-              }
-              host={event.host_name ? `By ${event.host_name}` : undefined}
-              iconColor={iconColor}
-              onPress={() => router.push(`../events/${event.id}`)}
-            />
-          ))}
+          {isLoading
+            ? Array.from({ length: 3 }).map((_, index) => (
+                <EventCardSkeleton key={`next-skeleton-${index}`} />
+              ))
+            : nextWeekEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  title={event.title}
+                  time={formatEventDateRange(event.start_at, event.end_at)}
+                  location={event.location ?? "Location TBD"}
+                  price={
+                    event.fee_type?.toLowerCase() === "paid"
+                      ? event.fee_amount
+                        ? `${event.fee_amount} ETB`
+                        : "Paid"
+                      : "Free"
+                  }
+                  image={
+                    resolveEventCoverUrl(event.cover_url) ?? fallbackEventImage
+                  }
+                  host={event.host_name ? `By ${event.host_name}` : undefined}
+                  iconColor={iconColor}
+                  onPress={() => router.push(`../events/${event.id}`)}
+                />
+              ))}
         </View>
 
         <View className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
@@ -457,6 +469,13 @@ export default function EventTabScreen() {
       >
         <Ionicons name="add" size={26} color={colors.chipActiveText} />
       </Pressable>
+
+      <FetchErrorModal
+        visible={Boolean(errorMessage)}
+        message={errorMessage}
+        onClose={() => setErrorMessage(null)}
+        onRetry={() => void loadEvents()}
+      />
     </View>
   );
 }

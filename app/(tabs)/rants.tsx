@@ -7,7 +7,9 @@ import {
   useColorScheme,
 } from "react-native";
 import { AppText } from "../../components/AppText";
+import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { ReportModal } from "../../components/ReportModal";
+import { SkeletonBlock } from "../../components/SkeletonBlock";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -62,6 +64,32 @@ const formatTimeAgo = (dateString: string) => {
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 };
+
+function RantCardSkeleton() {
+  return (
+    <View className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <View className="mb-3 flex-row items-center">
+        <SkeletonBlock className="h-9 w-9 rounded-full" />
+        <View className="ml-2.5 flex-1">
+          <SkeletonBlock className="h-3 w-32 rounded-md" />
+          <View className="mt-2 flex-row items-center gap-2">
+            <SkeletonBlock className="h-2.5 w-16 rounded-md" />
+            <SkeletonBlock className="h-2.5 w-12 rounded-md" />
+          </View>
+        </View>
+      </View>
+      <View className="gap-2">
+        <SkeletonBlock className="h-3 w-full rounded-md" />
+        <SkeletonBlock className="h-3 w-11/12 rounded-md" />
+        <SkeletonBlock className="h-3 w-4/5 rounded-md" />
+      </View>
+      <View className="mt-4 flex-row items-center justify-between">
+        <SkeletonBlock className="h-9 w-40 rounded-xl" />
+        <SkeletonBlock className="h-4 w-24 rounded-md" />
+      </View>
+    </View>
+  );
+}
 
 export default function RantsScreen() {
   const router = useRouter();
@@ -348,140 +376,136 @@ export default function RantsScreen() {
 
         {/* Cards */}
         <View className="mt-3 gap-4">
-          {isLoading ? (
-            <AppText className="text-sm text-slate-400 dark:text-slate-500">
-              Loading rants...
-            </AppText>
-          ) : null}
-          {errorMessage ? (
-            <AppText className="text-sm text-red-500">{errorMessage}</AppText>
-          ) : null}
-          {rants.map((rant) => (
-            <View
-              key={rant.id}
-              className="rounded-2xl p-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
-            >
-              {/* Card Header */}
-              <View className="flex-row items-center mb-3">
-                <View className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
-                  <Image
-                    source={{
-                      uri: rant.is_anonymous
-                        ? "https://placehold.co/40x40/png"
-                        : (rant.profile?.avatar_url ?? fallbackAvatar),
-                    }}
-                    className="w-full h-full"
-                  />
-                </View>
+          {isLoading
+            ? Array.from({ length: 4 }).map((_, index) => (
+                <RantCardSkeleton key={`rant-skeleton-${index}`} />
+              ))
+            : rants.map((rant) => (
+                <View
+                  key={rant.id}
+                  className="rounded-2xl p-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
+                >
+                  {/* Card Header */}
+                  <View className="flex-row items-center mb-3">
+                    <View className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
+                      <Image
+                        source={{
+                          uri: rant.is_anonymous
+                            ? "https://placehold.co/40x40/png"
+                            : (rant.profile?.avatar_url ?? fallbackAvatar),
+                        }}
+                        className="w-full h-full"
+                      />
+                    </View>
 
-                <View className="flex-1 ml-2.5">
-                  <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {rant.is_anonymous
-                      ? "Anonymous Student"
-                      : rant.profile?.full_name ||
-                        rant.profile?.username ||
-                        "Student"}
+                    <View className="flex-1 ml-2.5">
+                      <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {rant.is_anonymous
+                          ? "Anonymous Student"
+                          : rant.profile?.full_name ||
+                            rant.profile?.username ||
+                            "Student"}
+                      </AppText>
+
+                      <View className="flex-row items-center mt-0.5">
+                        <AppText className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {formatTimeAgo(rant.created_at)}
+                        </AppText>
+                        <View className="w-1 h-1 rounded-full mx-1.5 bg-slate-200 dark:bg-slate-800" />
+                        <AppText className="text-[11px] text-green-600 dark:text-green-400">
+                          {rant.category ?? "General"}
+                        </AppText>
+                      </View>
+                    </View>
+
+                    <Pressable
+                      className="p-1"
+                      onPress={() => {
+                        setSelectedReportId(rant.id);
+                        setIsReportOpen(true);
+                      }}
+                    >
+                      <Ionicons
+                        name="ellipsis-horizontal"
+                        size={20}
+                        color={iconColors.muted}
+                      />
+                    </Pressable>
+                  </View>
+
+                  {/* Content */}
+                  <AppText className="text-sm leading-5 text-slate-900 dark:text-slate-100">
+                    {rant.content}
                   </AppText>
 
-                  <View className="flex-row items-center mt-0.5">
-                    <AppText className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {formatTimeAgo(rant.created_at)}
-                    </AppText>
-                    <View className="w-1 h-1 rounded-full mx-1.5 bg-slate-200 dark:bg-slate-800" />
-                    <AppText className="text-[11px] text-green-600 dark:text-green-400">
-                      {rant.category ?? "General"}
-                    </AppText>
+                  {/* Actions */}
+                  <View className="mt-3.5 flex-row items-center justify-between">
+                    <View className="flex-row items-center gap-4 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900">
+                      <Pressable
+                        onPress={() => handleVote(rant.id, 1)}
+                        className="flex-row items-center gap-1"
+                      >
+                        <Ionicons
+                          name="arrow-up"
+                          size={18}
+                          color={
+                            rant.user_vote === 1
+                              ? iconColors.accent
+                              : iconColors.muted
+                          }
+                        />
+                        <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
+                          {rant.upvotes}
+                        </AppText>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleVote(rant.id, -1)}
+                        className="flex-row items-center gap-1"
+                      >
+                        <Ionicons
+                          name="arrow-down"
+                          size={18}
+                          color={
+                            rant.user_vote === -1
+                              ? iconColors.danger
+                              : iconColors.muted
+                          }
+                        />
+                        <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
+                          {rant.downvotes}
+                        </AppText>
+                      </Pressable>
+                    </View>
+
+                    <View className="flex-row items-center gap-3">
+                      <View className="flex-row items-center gap-1">
+                        <Ionicons
+                          name="eye-outline"
+                          size={15}
+                          color={iconColors.muted}
+                        />
+                        <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                          {rant.views}
+                        </AppText>
+                      </View>
+
+                      <Pressable
+                        onPress={() => router.push(`/rants/${rant.id}`)}
+                        className="flex-row items-center gap-1.5 px-2 py-1.5 rounded-lg"
+                      >
+                        <Ionicons
+                          name="chatbox-outline"
+                          size={16}
+                          color={iconColors.muted}
+                        />
+                        <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                          {rant.comment_count} Comments
+                        </AppText>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
-
-                <Pressable
-                  className="p-1"
-                  onPress={() => {
-                    setSelectedReportId(rant.id);
-                    setIsReportOpen(true);
-                  }}
-                >
-                  <Ionicons
-                    name="ellipsis-horizontal"
-                    size={20}
-                    color={iconColors.muted}
-                  />
-                </Pressable>
-              </View>
-
-              {/* Content */}
-              <AppText className="text-sm leading-5 text-slate-900 dark:text-slate-100">
-                {rant.content}
-              </AppText>
-
-              {/* Actions */}
-              <View className="mt-3.5 flex-row items-center justify-between">
-                <View className="flex-row items-center gap-4 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900">
-                  <Pressable
-                    onPress={() => handleVote(rant.id, 1)}
-                    className="flex-row items-center gap-1"
-                  >
-                    <Ionicons
-                      name="arrow-up"
-                      size={18}
-                      color={
-                        rant.user_vote === 1
-                          ? iconColors.accent
-                          : iconColors.muted
-                      }
-                    />
-                    <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
-                      {rant.upvotes}
-                    </AppText>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleVote(rant.id, -1)}
-                    className="flex-row items-center gap-1"
-                  >
-                    <Ionicons
-                      name="arrow-down"
-                      size={18}
-                      color={
-                        rant.user_vote === -1
-                          ? iconColors.danger
-                          : iconColors.muted
-                      }
-                    />
-                    <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
-                      {rant.downvotes}
-                    </AppText>
-                  </Pressable>
-                </View>
-
-                <View className="flex-row items-center gap-3">
-                  <View className="flex-row items-center gap-1">
-                    <Ionicons
-                      name="eye-outline"
-                      size={15}
-                      color={iconColors.muted}
-                    />
-                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                      {rant.views}
-                    </AppText>
-                  </View>
-
-                  <Pressable
-                    onPress={() => router.push(`/rants/${rant.id}`)}
-                    className="flex-row items-center gap-1.5 px-2 py-1.5 rounded-lg"
-                  >
-                    <Ionicons
-                      name="chatbox-outline"
-                      size={16}
-                      color={iconColors.muted}
-                    />
-                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                      {rant.comment_count} Comments
-                    </AppText>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          ))}
+              ))}
         </View>
 
         <AppText className="text-xs text-center mt-4 text-slate-400 dark:text-slate-500">
@@ -499,6 +523,13 @@ export default function RantsScreen() {
         visible={isReportOpen}
         onClose={() => setIsReportOpen(false)}
         onSubmit={handleReportSubmit}
+      />
+
+      <FetchErrorModal
+        visible={Boolean(errorMessage)}
+        message={errorMessage}
+        onClose={() => setErrorMessage(null)}
+        onRetry={() => void loadRants()}
       />
     </View>
   );
