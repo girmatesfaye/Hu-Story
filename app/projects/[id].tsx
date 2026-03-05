@@ -234,7 +234,7 @@ export default function ProjectDetailsScreen() {
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1 bg-white dark:bg-slate-950">
         <StatusBar style={statusBarStyle} />
-        <View className="flex-row items-center justify-between px-5 pb-3 pt-6">
+        <View className="flex-row items-center px-5 pb-3 pt-6">
           <TouchableOpacity
             className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900"
             accessibilityRole="button"
@@ -246,9 +246,13 @@ export default function ProjectDetailsScreen() {
               color={statusBarStyle === "light" ? "#E5E7EB" : "#0F172A"}
             />
           </TouchableOpacity>
-          <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
+          <AppText
+            numberOfLines={1}
+            className="mx-3 flex-1 text-center text-base font-semibold text-slate-900 dark:text-slate-100"
+          >
             Project Details
           </AppText>
+          <View className="h-10 w-10" />
           {/* <TouchableOpacity
             className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900"
             accessibilityRole="button"

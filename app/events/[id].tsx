@@ -372,9 +372,9 @@ export default function EventDetailsScreen() {
               {isGoing ? "Cancel Going" : "I'm Going"}
             </AppText>
           </Pressable>
-          <Pressable className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          {/* <Pressable className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
             <Ionicons name="bookmark-outline" size={18} color={colors.text} />
-          </Pressable>
+          </Pressable> */}
         </View>
       </View>
     </SafeAreaView>

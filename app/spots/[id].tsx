@@ -123,16 +123,20 @@ export default function SpotDetailsScreen() {
       <View className="flex-1 bg-white dark:bg-slate-950">
         <ScrollView contentContainerClassName="pb-28">
           {/* Header */}
-          <View className="flex-row items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+          <View className="flex-row items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
             <Pressable
               onPress={() => router.back()}
-              className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900"
+              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
             >
               <Ionicons name="arrow-back" size={20} color={colors.text} />
             </Pressable>
-            <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            <AppText
+              numberOfLines={1}
+              className="mx-3 flex-1 text-center text-lg font-semibold text-slate-900 dark:text-slate-100"
+            >
               {spot?.name ?? "Spot Details"}
             </AppText>
+            <View className="h-9 w-9" />
           </View>
           <ScrollView
             horizontal
