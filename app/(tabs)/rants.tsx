@@ -642,7 +642,7 @@ export default function RantsScreen() {
       {unreadCount > 0 ? (
         <Pressable
           onPress={handleJumpToFirstUnread}
-          className="absolute right-6 bottom-24 min-h-10 px-3 rounded-full items-center justify-center bg-slate-900 dark:bg-slate-100"
+          className="absolute right-8 bottom-24 min-h-10 px-3 rounded-full items-center justify-center bg-slate-900 dark:bg-slate-100"
         >
           <AppText className="text-sm font-semibold text-white dark:text-slate-900">
             ⬇ {unreadCount}
