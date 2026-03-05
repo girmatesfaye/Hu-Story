@@ -1,5 +1,13 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+  ViewToken,
+} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
@@ -51,6 +59,10 @@ export default function SpotsTabScreen() {
   const [spots, setSpots] = useState<SpotItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastVisibleIndex, setLastVisibleIndex] = useState(-1);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const flatListRef = useRef<FlatList<SpotItem>>(null);
+  const spotsLengthRef = useRef(0);
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
     muted: scheme === "dark" ? "#94A3B8" : "#64748B",
@@ -89,6 +101,48 @@ export default function SpotsTabScreen() {
     void loadSpots();
   }, [loadSpots]);
 
+  useEffect(() => {
+    spotsLengthRef.current = spots.length;
+    const nextUnread =
+      lastVisibleIndex >= 0
+        ? Math.max(spots.length - lastVisibleIndex - 1, 0)
+        : 0;
+    setUnreadCount(nextUnread);
+  }, [lastVisibleIndex, spots.length]);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+  });
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const indexes = viewableItems
+        .map((item) => item.index)
+        .filter((index): index is number => typeof index === "number");
+
+      if (indexes.length === 0) return;
+
+      const nextLastVisibleIndex = Math.max(...indexes);
+      setLastVisibleIndex(nextLastVisibleIndex);
+      setUnreadCount(
+        Math.max(spotsLengthRef.current - nextLastVisibleIndex - 1, 0),
+      );
+    },
+  );
+
+  const handleJumpToFirstUnread = useCallback(() => {
+    if (!flatListRef.current || unreadCount <= 0) return;
+
+    const targetIndex = Math.min(lastVisibleIndex + 1, spots.length - 1);
+    if (targetIndex < 0) return;
+
+    flatListRef.current.scrollToIndex({
+      index: targetIndex,
+      animated: true,
+      viewPosition: 0.1,
+    });
+  }, [lastVisibleIndex, spots.length, unreadCount]);
+
   const tagToneStyles: Record<string, { container: string; text: string }> = {
     food: { container: "bg-orange-100", text: "text-orange-700" },
     hangout: { container: "bg-purple-100", text: "text-purple-700" },
@@ -98,155 +152,256 @@ export default function SpotsTabScreen() {
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
-      <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-              Campus Spots
-            </AppText>
-            <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">
-              Find and share the best places around campus.
-            </AppText>
+      {isLoading ? (
+        <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
+          <View className="flex-row items-center justify-between">
+            <View>
+              <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                Campus Spots
+              </AppText>
+              <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">
+                Find and share the best places around campus.
+              </AppText>
+            </View>
+            <Pressable
+              onPress={() => router.push("../notifications/notification")}
+              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={iconColors.text}
+              />
+            </Pressable>
           </View>
-          <Pressable
-            onPress={() => router.push("../notifications/notification")}
-            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-          >
+
+          <View className="mt-5 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
             <Ionicons
-              name="notifications-outline"
-              size={22}
-              color={iconColors.text}
+              name="search-outline"
+              size={18}
+              color={colors.mutedText}
             />
-          </Pressable>
-        </View>
+            <TextInput
+              placeholder="Find coffee, library, lunch..."
+              placeholderTextColor={colors.mutedStrong}
+              className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+            />
+          </View>
 
-        <View className="mt-5 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-          <Ionicons name="search-outline" size={18} color={colors.mutedText} />
-          <TextInput
-            placeholder="Find coffee, library, lunch..."
-            placeholderTextColor={colors.mutedStrong}
-            className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-          />
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerClassName="mt-4 gap-3"
-        >
-          {categories.map((category) => {
-            const isActive = category === activeCategory;
-            return (
-              <Pressable
-                key={category}
-                className={`rounded-full px-4 py-2 ${
-                  isActive ? "bg-green-600" : "bg-slate-100 dark:bg-slate-900"
-                }`}
-                onPress={() => setActiveCategory(category)}
-              >
-                <AppText
-                  className={`text-xs font-semibold ${
-                    isActive
-                      ? "text-white"
-                      : "text-slate-600 dark:text-slate-300"
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="mt-4 gap-3"
+          >
+            {categories.map((category) => {
+              const isActive = category === activeCategory;
+              return (
+                <Pressable
+                  key={category}
+                  className={`rounded-full px-4 py-2 ${
+                    isActive ? "bg-green-600" : "bg-slate-100 dark:bg-slate-900"
                   }`}
+                  onPress={() => setActiveCategory(category)}
                 >
-                  {category}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                  <AppText
+                    className={`text-xs font-semibold ${
+                      isActive
+                        ? "text-white"
+                        : "text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {category}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
 
-        <View className="mt-5 gap-4">
-          {isLoading
-            ? Array.from({ length: 4 }).map((_, index) => (
-                <View
-                  key={`spot-skeleton-${index}`}
-                  className="flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <SkeletonBlock className="h-[90px] w-[90px] rounded-xl" />
-                  <View className="flex-1">
-                    <SkeletonBlock className="h-4 w-2/3 rounded-md" />
-                    <View className="mt-2 flex-row items-center gap-2">
-                      <SkeletonBlock className="h-5 w-16 rounded-md" />
-                      <SkeletonBlock className="h-3 w-1/3 rounded-md" />
-                    </View>
-                    <View className="mt-3 flex-row items-center justify-between">
-                      <SkeletonBlock className="h-3 w-24 rounded-md" />
-                      <SkeletonBlock className="h-5 w-14 rounded-md" />
-                    </View>
+          <View className="mt-5 gap-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View
+                key={`spot-skeleton-${index}`}
+                className="flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <SkeletonBlock className="h-[90px] w-[90px] rounded-xl" />
+                <View className="flex-1">
+                  <SkeletonBlock className="h-4 w-2/3 rounded-md" />
+                  <View className="mt-2 flex-row items-center gap-2">
+                    <SkeletonBlock className="h-5 w-16 rounded-md" />
+                    <SkeletonBlock className="h-3 w-1/3 rounded-md" />
+                  </View>
+                  <View className="mt-3 flex-row items-center justify-between">
+                    <SkeletonBlock className="h-3 w-24 rounded-md" />
+                    <SkeletonBlock className="h-5 w-14 rounded-md" />
                   </View>
                 </View>
-              ))
-            : spots.map((spot) => {
-                const tone =
-                  tagToneStyles[(spot.category ?? "").toLowerCase()] ??
-                  ({
-                    container: "bg-blue-100",
-                    text: "text-blue-700",
-                  } as const);
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={spots}
+          keyExtractor={(item) => item.id}
+          contentContainerClassName="px-5 pb-28 pt-4"
+          viewabilityConfig={viewabilityConfig.current}
+          onViewableItemsChanged={onViewableItemsChanged.current}
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            const offset = Math.max(index * averageItemLength, 0);
+            flatListRef.current?.scrollToOffset({ offset, animated: true });
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index, animated: true });
+            }, 120);
+          }}
+          ListHeaderComponent={
+            <>
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                    Campus Spots
+                  </AppText>
+                  <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">
+                    Find and share the best places around campus.
+                  </AppText>
+                </View>
+                <Pressable
+                  onPress={() => router.push("../notifications/notification")}
+                  className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+                >
+                  <Ionicons
+                    name="notifications-outline"
+                    size={22}
+                    color={iconColors.text}
+                  />
+                </Pressable>
+              </View>
 
-                return (
-                  <Pressable
-                    key={spot.id}
-                    onPress={() => router.push(`../spots/${spot.id}`)}
-                    className="flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <Image
-                      source={{ uri: spot.cover_url ?? fallbackSpotImage }}
-                      className="h-[90px] w-[90px] rounded-xl"
-                      resizeMode="cover"
-                    />
+              <View className="mt-5 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                <Ionicons
+                  name="search-outline"
+                  size={18}
+                  color={colors.mutedText}
+                />
+                <TextInput
+                  placeholder="Find coffee, library, lunch..."
+                  placeholderTextColor={colors.mutedStrong}
+                  className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                />
+              </View>
 
-                    <View className="flex-1">
-                      <AppText className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">
-                        {spot.name}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName="mt-4 gap-3"
+              >
+                {categories.map((category) => {
+                  const isActive = category === activeCategory;
+                  return (
+                    <Pressable
+                      key={category}
+                      className={`rounded-full px-4 py-2 ${
+                        isActive
+                          ? "bg-green-600"
+                          : "bg-slate-100 dark:bg-slate-900"
+                      }`}
+                      onPress={() => setActiveCategory(category)}
+                    >
+                      <AppText
+                        className={`text-xs font-semibold ${
+                          isActive
+                            ? "text-white"
+                            : "text-slate-600 dark:text-slate-300"
+                        }`}
+                      >
+                        {category}
                       </AppText>
-                      <View className="mt-2 flex-row items-center gap-2">
-                        <View
-                          className={`rounded-md px-2 py-0.5 ${tone.container} dark:bg-opacity-20`}
-                        >
-                          <AppText
-                            className={`text-[11px] font-semibold ${tone.text}`}
-                          >
-                            {spot.category ?? "Other"}
-                          </AppText>
-                        </View>
-                        <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                          {spot.location ?? "Location TBD"}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              <View className="h-5" />
+            </>
+          }
+          renderItem={({ item: spot }) => {
+            const tone =
+              tagToneStyles[(spot.category ?? "").toLowerCase()] ??
+              ({
+                container: "bg-blue-100",
+                text: "text-blue-700",
+              } as const);
+
+            return (
+              <Pressable
+                onPress={() => router.push(`../spots/${spot.id}`)}
+                className="flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <Image
+                  source={{ uri: spot.cover_url ?? fallbackSpotImage }}
+                  className="h-[90px] w-[90px] rounded-xl"
+                  resizeMode="cover"
+                />
+
+                <View className="flex-1">
+                  <AppText className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">
+                    {spot.name}
+                  </AppText>
+                  <View className="mt-2 flex-row items-center gap-2">
+                    <View
+                      className={`rounded-md px-2 py-0.5 ${tone.container} dark:bg-opacity-20`}
+                    >
+                      <AppText
+                        className={`text-[11px] font-semibold ${tone.text}`}
+                      >
+                        {spot.category ?? "Other"}
+                      </AppText>
+                    </View>
+                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                      {spot.location ?? "Location TBD"}
+                    </AppText>
+                  </View>
+
+                  <View className="mt-2 flex-row items-center justify-between">
+                    <View className="flex-row items-center gap-1">
+                      <Ionicons name="star" size={14} color="#F59E0B" />
+                      <AppText className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                        {spot.rating_avg.toFixed(1)}
+                      </AppText>
+                      <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                        ({spot.review_count})
+                      </AppText>
+                    </View>
+
+                    {spot.price_type?.toLowerCase() === "free" ? (
+                      <View className="rounded-md bg-green-100 px-2 py-1 dark:bg-green-400/20">
+                        <AppText className="text-xs font-semibold text-green-700 dark:text-green-300">
+                          Free
                         </AppText>
                       </View>
+                    ) : (
+                      <AppText className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                        {spot.price_type ?? "Paid"}
+                      </AppText>
+                    )}
+                  </View>
+                </View>
+              </Pressable>
+            );
+          }}
+          ItemSeparatorComponent={() => <View className="h-4" />}
+        />
+      )}
 
-                      <View className="mt-2 flex-row items-center justify-between">
-                        <View className="flex-row items-center gap-1">
-                          <Ionicons name="star" size={14} color="#F59E0B" />
-                          <AppText className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                            {spot.rating_avg.toFixed(1)}
-                          </AppText>
-                          <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                            ({spot.review_count})
-                          </AppText>
-                        </View>
-
-                        {spot.price_type?.toLowerCase() === "free" ? (
-                          <View className="rounded-md bg-green-100 px-2 py-1 dark:bg-green-400/20">
-                            <AppText className="text-xs font-semibold text-green-700 dark:text-green-300">
-                              Free
-                            </AppText>
-                          </View>
-                        ) : (
-                          <AppText className="text-xs font-semibold text-slate-400 dark:text-slate-500">
-                            {spot.price_type ?? "Paid"}
-                          </AppText>
-                        )}
-                      </View>
-                    </View>
-                  </Pressable>
-                );
-              })}
-        </View>
-      </ScrollView>
+      {unreadCount > 0 ? (
+        <Pressable
+          onPress={handleJumpToFirstUnread}
+          className="absolute right-6 bottom-24 min-h-10 px-3 rounded-full items-center justify-center bg-slate-900 dark:bg-slate-100"
+        >
+          <AppText className="text-sm font-semibold text-white dark:text-slate-900">
+            ⬇ {unreadCount}
+          </AppText>
+        </Pressable>
+      ) : null}
       {/* Floating Action Button */}
       <Pressable
         onPress={() => router.push("/spots/create-spots")}
