@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
+import { FetchErrorModal } from "../../components/FetchErrorModal";
+import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
@@ -42,85 +44,73 @@ export default function EventDetailsScreen() {
   const { colors } = useTheme();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isGoing, setIsGoing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadEvent = useCallback(async () => {
+    if (!id) return;
 
-    const loadEvent = async () => {
-      if (!id) return;
+    setIsLoading(true);
+    setFetchError(null);
+    setIsGoing(false);
 
-      setIsLoading(true);
-      setErrorMessage(null);
-      setIsGoing(false);
+    const { data, error } = await supabase
+      .from("events")
+      .select(
+        "id, title, description, start_at, end_at, location, address, cover_url, tags, attendees_count, host_name",
+      )
+      .eq("id", id)
+      .maybeSingle();
 
-      const { data, error } = await supabase
-        .from("events")
-        .select(
-          "id, title, description, start_at, end_at, location, address, cover_url, tags, attendees_count, host_name",
-        )
-        .eq("id", id)
-        .maybeSingle();
+    if (error) {
+      setFetchError(error.message);
+      setEvent(null);
+    } else {
+      setEvent((data as EventDetail) ?? null);
+    }
 
-      if (!isMounted) return;
-
-      if (error) {
-        setErrorMessage(error.message);
-        setEvent(null);
-      } else {
-        setEvent((data as EventDetail) ?? null);
-      }
-
-      setIsLoading(false);
-    };
-
-    const loadGoingStatus = async () => {
-      if (!id) return;
-
-      const { data: authData, error: authError } =
-        await supabase.auth.getUser();
-
-      if (!isMounted) return;
-
-      if (authError) {
-        setUserId(null);
-        return;
-      }
-
-      const currentUserId = authData?.user?.id ?? null;
-      setUserId(currentUserId);
-
-      if (!currentUserId) {
-        setIsGoing(false);
-        return;
-      }
-
-      const { data: existing, error: existingError } = await supabase
-        .from("event_attendees")
-        .select("event_id")
-        .eq("event_id", id)
-        .eq("user_id", currentUserId)
-        .maybeSingle();
-
-      if (!isMounted) return;
-
-      if (!existingError && existing) {
-        setIsGoing(true);
-      } else {
-        setIsGoing(false);
-      }
-    };
-
-    loadEvent();
-    loadGoingStatus();
-
-    return () => {
-      isMounted = false;
-    };
+    setIsLoading(false);
   }, [id]);
+
+  const loadGoingStatus = useCallback(async () => {
+    if (!id) return;
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      setUserId(null);
+      return;
+    }
+
+    const currentUserId = authData?.user?.id ?? null;
+    setUserId(currentUserId);
+
+    if (!currentUserId) {
+      setIsGoing(false);
+      return;
+    }
+
+    const { data: existing, error: existingError } = await supabase
+      .from("event_attendees")
+      .select("event_id")
+      .eq("event_id", id)
+      .eq("user_id", currentUserId)
+      .maybeSingle();
+
+    if (!existingError && existing) {
+      setIsGoing(true);
+    } else {
+      setIsGoing(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void loadEvent();
+    void loadGoingStatus();
+  }, [loadEvent, loadGoingStatus]);
 
   const handleGoing = async () => {
     if (!event || isUpdating || isGoing) return;
@@ -217,143 +207,167 @@ export default function EventDetailsScreen() {
             <View className="w-14" />
           </View>
 
-          <View className="relative">
-            <Image
-              source={{
-                uri:
-                  resolveEventCoverUrl(event?.cover_url ?? null) ??
-                  fallbackEventImage,
-              }}
-              className="h-[240px] w-full"
-              resizeMode="cover"
-            />
-            <View className="absolute inset-0 bg-black/30" />
-
-            <View className="absolute left-5 top-5 rounded-2xl bg-white px-3 py-2 shadow dark:bg-slate-900">
-              <AppText className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                {dateBadge.month}
-              </AppText>
-              <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {dateBadge.day}
-              </AppText>
+          {isLoading && !event ? (
+            <View>
+              <SkeletonBlock className="h-[240px] w-full" />
+              <View className="px-5 pt-4">
+                <SkeletonBlock className="h-8 w-2/3 rounded-md" />
+                <SkeletonBlock className="mt-3 h-4 w-1/3 rounded-md" />
+                <View className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                  <SkeletonBlock className="h-4 w-2/3 rounded-md" />
+                  <SkeletonBlock className="mt-3 h-4 w-1/2 rounded-md" />
+                  <SkeletonBlock className="mt-3 h-4 w-1/3 rounded-md" />
+                </View>
+                <SkeletonBlock className="mt-6 h-5 w-1/3 rounded-md" />
+                <SkeletonBlock className="mt-3 h-4 w-full rounded-md" />
+                <SkeletonBlock className="mt-2 h-4 w-5/6 rounded-md" />
+              </View>
             </View>
+          ) : (
+            <>
+              <View className="relative">
+                <Image
+                  source={{
+                    uri:
+                      resolveEventCoverUrl(event?.cover_url ?? null) ??
+                      fallbackEventImage,
+                  }}
+                  className="h-[240px] w-full"
+                  resizeMode="cover"
+                />
+                <View className="absolute inset-0 bg-black/30" />
 
-            <View className="absolute bottom-4 left-5 flex-row gap-2">
-              {(event?.tags ?? []).map((tag) => (
-                <View
-                  key={tag}
-                  className="rounded-full border border-green-600/30 bg-green-100 px-3 py-1 dark:border-green-400/30 dark:bg-green-400/20"
-                >
-                  <AppText className="text-[11px] font-semibold text-green-700 dark:text-green-300">
-                    {tag}
+                <View className="absolute left-5 top-5 rounded-2xl bg-white px-3 py-2 shadow dark:bg-slate-900">
+                  <AppText className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                    {dateBadge.month}
+                  </AppText>
+                  <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    {dateBadge.day}
                   </AppText>
                 </View>
-              ))}
-            </View>
-          </View>
 
-          <View className="px-5 pt-4">
-            <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-              {isLoading ? "Loading event..." : (event?.title ?? "Event")}
-            </AppText>
-            <AppText className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Hosted by{" "}
-              <AppText className="text-sm font-semibold text-green-700 dark:text-green-300">
-                {event?.host_name ?? "Campus"}
-              </AppText>
-            </AppText>
-
-            {errorMessage ? (
-              <AppText className="mt-3 text-sm text-red-500">
-                {errorMessage}
-              </AppText>
-            ) : null}
-
-            <View className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <View className="flex-row items-start gap-3">
-                <View className="h-10 w-10 items-center justify-center rounded-xl bg-green-100 dark:bg-green-400/20">
-                  <Ionicons
-                    name="time-outline"
-                    size={18}
-                    color={colors.accent}
-                  />
-                </View>
-                <View className="flex-1">
-                  <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {formatEventDateRange(
-                      event?.start_at ?? null,
-                      event?.end_at ?? null,
-                      {
-                        fallback: "Time TBD",
-                      },
-                    )}
-                  </AppText>
-                  <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Add to calendar
-                  </AppText>
+                <View className="absolute bottom-4 left-5 flex-row gap-2">
+                  {(event?.tags ?? []).map((tag) => (
+                    <View
+                      key={tag}
+                      className="rounded-full border border-green-600/30 bg-green-100 px-3 py-1 dark:border-green-400/30 dark:bg-green-400/20"
+                    >
+                      <AppText className="text-[11px] font-semibold text-green-700 dark:text-green-300">
+                        {tag}
+                      </AppText>
+                    </View>
+                  ))}
                 </View>
               </View>
 
-              <View className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
-
-              <View className="flex-row items-start gap-3">
-                <View className="h-10 w-10 items-center justify-center rounded-xl bg-green-100 dark:bg-green-400/20">
-                  <Ionicons
-                    name="location-outline"
-                    size={18}
-                    color={colors.accent}
-                  />
-                </View>
-                <View className="flex-1">
-                  <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {event?.location ?? "Location TBD"}
-                  </AppText>
-                  <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {event?.address ?? "Address TBD"}
-                  </AppText>
-                </View>
-              </View>
-
-              <View className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
-
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center">
-                  <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                    {event?.attendees_count ?? 0}
-                  </AppText>
-                </View>
-                <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                  students are going
+              <View className="px-5 pt-4">
+                <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                  {event?.title ?? "Event"}
                 </AppText>
-              </View>
-            </View>
-
-            <AppText className="mt-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
-              About this event
-            </AppText>
-            <AppText className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              {event?.description ?? "No description yet."}
-            </AppText>
-
-            <View className="mt-6 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-              <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1526779259212-939e64788e3c?auto=format&fit=crop&w=1200&q=80",
-                }}
-                className="h-[160px] w-full"
-                resizeMode="cover"
-              />
-              <View className="absolute inset-0 bg-black/20" />
-              <View className="absolute inset-x-0 bottom-4 items-center">
-                <Pressable className="flex-row items-center gap-2 rounded-full bg-white px-4 py-2 shadow">
-                  <Ionicons name="navigate" size={16} color={colors.accent} />
-                  <AppText className="text-sm font-semibold text-slate-900">
-                    Get Directions
+                <AppText className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  Hosted by{" "}
+                  <AppText className="text-sm font-semibold text-green-700 dark:text-green-300">
+                    {event?.host_name ?? "Campus"}
                   </AppText>
-                </Pressable>
+                </AppText>
+
+                {errorMessage ? (
+                  <AppText className="mt-3 text-sm text-red-500">
+                    {errorMessage}
+                  </AppText>
+                ) : null}
+
+                <View className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <View className="flex-row items-start gap-3">
+                    <View className="h-10 w-10 items-center justify-center rounded-xl bg-green-100 dark:bg-green-400/20">
+                      <Ionicons
+                        name="time-outline"
+                        size={18}
+                        color={colors.accent}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {formatEventDateRange(
+                          event?.start_at ?? null,
+                          event?.end_at ?? null,
+                          {
+                            fallback: "Time TBD",
+                          },
+                        )}
+                      </AppText>
+                      <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Add to calendar
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <View className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
+
+                  <View className="flex-row items-start gap-3">
+                    <View className="h-10 w-10 items-center justify-center rounded-xl bg-green-100 dark:bg-green-400/20">
+                      <Ionicons
+                        name="location-outline"
+                        size={18}
+                        color={colors.accent}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {event?.location ?? "Location TBD"}
+                      </AppText>
+                      <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {event?.address ?? "Address TBD"}
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <View className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
+
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center">
+                      <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                        {event?.attendees_count ?? 0}
+                      </AppText>
+                    </View>
+                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                      students are going
+                    </AppText>
+                  </View>
+                </View>
+
+                <AppText className="mt-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  About this event
+                </AppText>
+                <AppText className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {event?.description ?? "No description yet."}
+                </AppText>
+
+                <View className="mt-6 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <Image
+                    source={{
+                      uri: "https://images.unsplash.com/photo-1526779259212-939e64788e3c?auto=format&fit=crop&w=1200&q=80",
+                    }}
+                    className="h-[160px] w-full"
+                    resizeMode="cover"
+                  />
+                  <View className="absolute inset-0 bg-black/20" />
+                  <View className="absolute inset-x-0 bottom-4 items-center">
+                    <Pressable className="flex-row items-center gap-2 rounded-full bg-white px-4 py-2 shadow">
+                      <Ionicons
+                        name="navigate"
+                        size={16}
+                        color={colors.accent}
+                      />
+                      <AppText className="text-sm font-semibold text-slate-900">
+                        Get Directions
+                      </AppText>
+                    </Pressable>
+                  </View>
+                </View>
               </View>
-            </View>
-          </View>
+            </>
+          )}
         </ScrollView>
 
         <View className="absolute bottom-0 left-0 right-0 flex-row items-center gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
@@ -376,6 +390,16 @@ export default function EventDetailsScreen() {
             <Ionicons name="bookmark-outline" size={18} color={colors.text} />
           </Pressable> */}
         </View>
+
+        <FetchErrorModal
+          visible={Boolean(fetchError)}
+          message={fetchError}
+          onClose={() => setFetchError(null)}
+          onRetry={() => {
+            void loadEvent();
+            void loadGoingStatus();
+          }}
+        />
       </View>
     </SafeAreaView>
   );

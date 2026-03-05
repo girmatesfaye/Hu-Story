@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
+import { FetchErrorModal } from "../../components/FetchErrorModal";
+import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
 import { supabase } from "../../lib/supabase";
 
@@ -52,71 +54,61 @@ export default function SpotDetailsScreen() {
   const [spotImages, setSpotImages] = useState<string[]>([]);
   const [reviews, setReviews] = useState<SpotReview[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const galleryImages = [spot?.cover_url, ...spotImages].filter(
     (url): url is string => Boolean(url),
   );
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadSpot = useCallback(async () => {
+    if (!id) return;
 
-    const loadSpot = async () => {
-      if (!id) return;
+    setIsLoading(true);
+    setFetchError(null);
 
-      setIsLoading(true);
-      setErrorMessage(null);
+    const { data: spotData, error: spotError } = await supabase
+      .from("spots")
+      .select(
+        "id, name, category, rating_avg, location, description, cover_url",
+      )
+      .eq("id", id)
+      .maybeSingle();
 
-      const { data: spotData, error: spotError } = await supabase
-        .from("spots")
-        .select(
-          "id, name, category, rating_avg, location, description, cover_url",
-        )
-        .eq("id", id)
-        .maybeSingle();
+    const { data: reviewData, error: reviewError } = await supabase
+      .from("spot_reviews")
+      .select("id, rating, content, created_at, user_id")
+      .eq("spot_id", id)
+      .order("created_at", { ascending: false });
 
-      if (spotError && isMounted) {
-        setErrorMessage(spotError.message);
-      }
+    const { data: imageData, error: imageError } = await supabase
+      .from("spot_images")
+      .select("image_url, position")
+      .eq("spot_id", id)
+      .order("position", { ascending: true });
 
-      const { data: reviewData, error: reviewError } = await supabase
-        .from("spot_reviews")
-        .select("id, rating, content, created_at, user_id")
-        .eq("spot_id", id)
-        .order("created_at", { ascending: false });
+    if (spotError || reviewError || imageError) {
+      setFetchError(
+        spotError?.message ??
+          reviewError?.message ??
+          imageError?.message ??
+          "Unable to load spot details.",
+      );
+    }
 
-      const { data: imageData, error: imageError } = await supabase
-        .from("spot_images")
-        .select("image_url, position")
-        .eq("spot_id", id)
-        .order("position", { ascending: true });
-
-      if (reviewError && isMounted) {
-        setErrorMessage(reviewError.message);
-      }
-
-      if (imageError && isMounted) {
-        setErrorMessage(imageError.message);
-      }
-
-      if (isMounted) {
-        setSpot((spotData as SpotDetail) ?? null);
-        setReviews((reviewData ?? []) as SpotReview[]);
-        setSpotImages(
-          (imageData ?? [])
-            .map((item) => item.image_url)
-            .filter((url): url is string => Boolean(url)),
-        );
-        setIsLoading(false);
-      }
-    };
-
-    loadSpot();
-
-    return () => {
-      isMounted = false;
-    };
+    setSpot((spotData as SpotDetail) ?? null);
+    setReviews((reviewData ?? []) as SpotReview[]);
+    setSpotImages(
+      (imageData ?? [])
+        .map((item) => item.image_url)
+        .filter((url): url is string => Boolean(url)),
+    );
+    setIsLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    void loadSpot();
+  }, [loadSpot]);
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
@@ -138,28 +130,36 @@ export default function SpotDetailsScreen() {
             </AppText>
             <View className="h-9 w-9" />
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="px-5 pt-4 gap-4"
-          >
-            {galleryImages.length > 0 ? (
-              galleryImages.map((imageUrl, index) => (
+          {isLoading && !spot ? (
+            <View className="px-5 pt-4 gap-4">
+              <SkeletonBlock className="h-[220px] w-full rounded-2xl" />
+              <SkeletonBlock className="h-4 w-2/3 rounded-md" />
+              <SkeletonBlock className="h-4 w-1/2 rounded-md" />
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerClassName="px-5 pt-4 gap-4"
+            >
+              {galleryImages.length > 0 ? (
+                galleryImages.map((imageUrl, index) => (
+                  <Image
+                    key={`${imageUrl}-${index}`}
+                    source={{ uri: imageUrl }}
+                    className="h-[220px] w-[280px] rounded-2xl"
+                    resizeMode="cover"
+                  />
+                ))
+              ) : (
                 <Image
-                  key={`${imageUrl}-${index}`}
-                  source={{ uri: imageUrl }}
+                  source={{ uri: fallbackSpotImage }}
                   className="h-[220px] w-[280px] rounded-2xl"
                   resizeMode="cover"
                 />
-              ))
-            ) : (
-              <Image
-                source={{ uri: fallbackSpotImage }}
-                className="h-[220px] w-[280px] rounded-2xl"
-                resizeMode="cover"
-              />
-            )}
-          </ScrollView>
+              )}
+            </ScrollView>
+          )}
           <View className="px-5 pt-4">
             <View className="flex-row items-center gap-3">
               <View className="rounded-full bg-green-100 px-3 py-1 dark:bg-green-400/20">
@@ -186,9 +186,7 @@ export default function SpotDetailsScreen() {
             </View>
 
             <AppText className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              {isLoading
-                ? "Loading details..."
-                : (spot?.description ?? "No description yet.")}
+              {spot?.description ?? "No description yet."}
             </AppText>
 
             {errorMessage ? (
@@ -284,6 +282,13 @@ export default function SpotDetailsScreen() {
             </AppText>
           </Pressable>
         </View>
+
+        <FetchErrorModal
+          visible={Boolean(fetchError)}
+          message={fetchError}
+          onClose={() => setFetchError(null)}
+          onRetry={() => void loadSpot()}
+        />
       </View>
     </SafeAreaView>
   );

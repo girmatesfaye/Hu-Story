@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Feather from "@expo/vector-icons/Feather";
 import { AppText } from "../../../components/AppText";
+import { FetchErrorModal } from "../../../components/FetchErrorModal";
+import { SkeletonBlock } from "../../../components/SkeletonBlock";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../lib/supabase";
 import { useSupabase } from "../../../providers/SupabaseProvider";
@@ -25,7 +27,9 @@ export default function EditRantScreen() {
   const [text, setText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -34,7 +38,7 @@ export default function EditRantScreen() {
       if (!id) return;
 
       setIsLoading(true);
-      setErrorMessage(null);
+      setFetchError(null);
 
       const { data, error } = await supabase
         .from("rants")
@@ -45,13 +49,13 @@ export default function EditRantScreen() {
       if (!isMounted) return;
 
       if (error) {
-        setErrorMessage(error.message);
+        setFetchError(error.message);
       } else if (!data) {
-        setErrorMessage("Rant not found.");
+        setFetchError("Rant not found.");
       } else {
         const rant = data as RantRow;
         if (session?.user?.id && rant.user_id !== session.user.id) {
-          setErrorMessage("You do not have permission to edit this rant.");
+          setFetchError("You do not have permission to edit this rant.");
         }
         setActiveCategory(rant.category ?? categories[0]);
         setText(rant.content ?? "");
@@ -65,7 +69,7 @@ export default function EditRantScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id, session?.user?.id]);
+  }, [id, session?.user?.id, reloadKey]);
 
   const handleSave = async () => {
     if (!session?.user) {
@@ -122,54 +126,71 @@ export default function EditRantScreen() {
       </View>
 
       <ScrollView contentContainerClassName="px-5 pt-4 pb-6">
-        <AppText className="text-xs tracking-widest text-slate-400 dark:text-slate-500">
-          SELECT A CATEGORY
-        </AppText>
-
-        <View className="flex-row flex-wrap gap-3 mt-3">
-          {categories.map((category) => {
-            const active = category === activeCategory;
-            return (
-              <Pressable
-                key={category}
-                onPress={() => setActiveCategory(category)}
-                className={`px-4 py-2.5 rounded-full border ${
-                  active
-                    ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
-                    : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
-                }`}
-              >
-                <AppText
-                  className={`text-sm font-semibold ${
-                    active
-                      ? "text-white dark:text-slate-950"
-                      : "text-slate-600 dark:text-slate-300"
-                  }`}
-                >
-                  {category}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View className="mt-6">
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder={isLoading ? "Loading..." : "Update your rant..."}
-            placeholderTextColor="#CBD5F5"
-            multiline
-            editable={!isLoading}
-            className="min-h-[240px] text-base leading-6 text-slate-900 dark:text-slate-100"
-          />
-          <View className="mt-2 h-[1px] bg-slate-200 dark:bg-slate-800" />
-          <View className="flex-row items-center justify-end mt-2">
-            <AppText className="text-sm text-slate-400 dark:text-slate-500">
-              {text.length}/280
-            </AppText>
+        {isLoading ? (
+          <View className="gap-4">
+            <SkeletonBlock className="h-4 w-40 rounded-md" />
+            <View className="flex-row flex-wrap gap-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <SkeletonBlock
+                  key={`category-skeleton-${index}`}
+                  className="h-10 w-24 rounded-full"
+                />
+              ))}
+            </View>
+            <SkeletonBlock className="mt-2 h-[240px] w-full rounded-xl" />
           </View>
-        </View>
+        ) : (
+          <>
+            <AppText className="text-xs tracking-widest text-slate-400 dark:text-slate-500">
+              SELECT A CATEGORY
+            </AppText>
+
+            <View className="flex-row flex-wrap gap-3 mt-3">
+              {categories.map((category) => {
+                const active = category === activeCategory;
+                return (
+                  <Pressable
+                    key={category}
+                    onPress={() => setActiveCategory(category)}
+                    className={`px-4 py-2.5 rounded-full border ${
+                      active
+                        ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
+                        : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
+                    }`}
+                  >
+                    <AppText
+                      className={`text-sm font-semibold ${
+                        active
+                          ? "text-white dark:text-slate-950"
+                          : "text-slate-600 dark:text-slate-300"
+                      }`}
+                    >
+                      {category}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View className="mt-6">
+              <TextInput
+                value={text}
+                onChangeText={setText}
+                placeholder="Update your rant..."
+                placeholderTextColor="#CBD5F5"
+                multiline
+                editable
+                className="min-h-[240px] text-base leading-6 text-slate-900 dark:text-slate-100"
+              />
+              <View className="mt-2 h-[1px] bg-slate-200 dark:bg-slate-800" />
+              <View className="flex-row items-center justify-end mt-2">
+                <AppText className="text-sm text-slate-400 dark:text-slate-500">
+                  {text.length}/280
+                </AppText>
+              </View>
+            </View>
+          </>
+        )}
 
         {errorMessage ? (
           <AppText className="mt-4 text-sm text-red-500">
@@ -194,6 +215,13 @@ export default function EditRantScreen() {
           </View>
         </Pressable>
       </View>
+
+      <FetchErrorModal
+        visible={Boolean(fetchError)}
+        message={fetchError}
+        onClose={() => setFetchError(null)}
+        onRetry={() => setReloadKey((prev) => prev + 1)}
+      />
     </SafeAreaView>
   );
 }

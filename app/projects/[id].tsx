@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Image,
   Linking,
@@ -13,6 +13,8 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
+import { FetchErrorModal } from "../../components/FetchErrorModal";
+import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
@@ -66,6 +68,7 @@ export default function ProjectDetailsScreen() {
   const [author, setAuthor] = useState<ProjectAuthor | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const iconColors = {
     muted: scheme === "dark" ? "#94A3B8" : "#64748B",
@@ -88,63 +91,66 @@ export default function ProjectDetailsScreen() {
     return generated;
   };
 
+  const loadProject = useCallback(async () => {
+    if (!id) return;
+
+    setIsLoading(true);
+    setFetchError(null);
+
+    const { data, error } = await supabase
+      .from("projects")
+      .select(
+        "id, user_id, is_anonymous, title, summary, details, tags, views, likes, cover_url, repo_url, created_at",
+      )
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      setFetchError(error.message);
+      setProject(null);
+      setAuthor(null);
+      setIsLiked(false);
+      setIsLoading(false);
+      return;
+    }
+
+    const detail = (data as ProjectDetail) ?? null;
+    setProject(detail);
+    if (detail && !detail.is_anonymous && detail.user_id) {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("full_name, username, avatar_url")
+        .eq("user_id", detail.user_id)
+        .maybeSingle();
+      setAuthor((profileData as ProjectAuthor) ?? null);
+    } else {
+      setAuthor(null);
+    }
+
+    if (detail && session?.user?.id) {
+      const { data: likeData } = await supabase
+        .from("project_likes")
+        .select("project_id")
+        .eq("project_id", detail.id)
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      setIsLiked(Boolean(likeData));
+    } else {
+      setIsLiked(false);
+    }
+
+    setIsLoading(false);
+  }, [id, session?.user?.id]);
+
   useEffect(() => {
     let isMounted = true;
 
-    const loadProject = async () => {
-      if (!id) return;
-
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      const { data, error } = await supabase
-        .from("projects")
-        .select(
-          "id, user_id, is_anonymous, title, summary, details, tags, views, likes, cover_url, repo_url, created_at",
-        )
-        .eq("id", id)
-        .maybeSingle();
-
+    const loadWithGuard = async () => {
       if (!isMounted) return;
-
-      if (error) {
-        setErrorMessage(error.message);
-        setProject(null);
-      } else {
-        const detail = (data as ProjectDetail) ?? null;
-        setProject(detail);
-        if (detail && !detail.is_anonymous && detail.user_id) {
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("full_name, username, avatar_url")
-            .eq("user_id", detail.user_id)
-            .maybeSingle();
-          if (isMounted) {
-            setAuthor((profileData as ProjectAuthor) ?? null);
-          }
-        } else {
-          setAuthor(null);
-        }
-
-        if (detail && session?.user?.id) {
-          const { data: likeData } = await supabase
-            .from("project_likes")
-            .select("project_id")
-            .eq("project_id", detail.id)
-            .eq("user_id", session.user.id)
-            .maybeSingle();
-          if (isMounted) {
-            setIsLiked(Boolean(likeData));
-          }
-        } else if (isMounted) {
-          setIsLiked(false);
-        }
-      }
-
-      setIsLoading(false);
+      await loadProject();
     };
 
-    loadProject();
+    loadWithGuard();
 
     const incrementViews = async () => {
       if (!id) return;
@@ -175,7 +181,7 @@ export default function ProjectDetailsScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id, session?.user?.id]);
+  }, [id, session?.user?.id, loadProject]);
 
   const handleToggleLike = async () => {
     if (!session?.user?.id || !project) {
@@ -270,7 +276,28 @@ export default function ProjectDetailsScreen() {
           contentContainerClassName="pb-28"
           showsVerticalScrollIndicator={false}
         >
-          {project?.cover_url ? (
+          {isLoading && !project ? (
+            <View>
+              <SkeletonBlock className="h-56 w-full" />
+              <View className="px-5 pt-6">
+                <SkeletonBlock className="h-8 w-2/3 rounded-md" />
+                <View className="mt-4 flex-row items-center gap-3">
+                  <SkeletonBlock className="h-10 w-10 rounded-full" />
+                  <View className="flex-1 gap-2">
+                    <SkeletonBlock className="h-3 w-1/3 rounded-md" />
+                    <SkeletonBlock className="h-3 w-1/4 rounded-md" />
+                  </View>
+                </View>
+                <View className="mt-4 flex-row gap-6">
+                  <SkeletonBlock className="h-4 w-16 rounded-md" />
+                  <SkeletonBlock className="h-4 w-16 rounded-md" />
+                </View>
+                <SkeletonBlock className="mt-6 h-5 w-1/3 rounded-md" />
+                <SkeletonBlock className="mt-4 h-4 w-full rounded-md" />
+                <SkeletonBlock className="mt-2 h-4 w-5/6 rounded-md" />
+              </View>
+            </View>
+          ) : project?.cover_url ? (
             <Image
               source={{ uri: project.cover_url }}
               className="h-56 w-full"
@@ -394,6 +421,13 @@ export default function ProjectDetailsScreen() {
             />
           </Pressable>
         </View>
+
+        <FetchErrorModal
+          visible={Boolean(fetchError)}
+          message={fetchError}
+          onClose={() => setFetchError(null)}
+          onRetry={() => void loadProject()}
+        />
       </View>
     </SafeAreaView>
   );

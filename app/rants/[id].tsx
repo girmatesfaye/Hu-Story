@@ -13,6 +13,8 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "../../components/AppText";
+import { FetchErrorModal } from "../../components/FetchErrorModal";
+import { SkeletonBlock } from "../../components/SkeletonBlock";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -80,7 +82,9 @@ export default function RantCommentsScreen() {
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
@@ -154,7 +158,7 @@ export default function RantCommentsScreen() {
       if (!id) return;
 
       setIsLoading(true);
-      setErrorMessage(null);
+      setFetchError(null);
 
       const { data: rantData, error: rantError } = await supabase
         .from("rants")
@@ -165,7 +169,7 @@ export default function RantCommentsScreen() {
         .maybeSingle();
 
       if (rantError && isMounted) {
-        setErrorMessage(rantError.message);
+        setFetchError(rantError.message);
       }
 
       const { data: commentData, error: commentError } = await supabase
@@ -177,7 +181,7 @@ export default function RantCommentsScreen() {
         .order("created_at", { ascending: true });
 
       if (commentError && isMounted) {
-        setErrorMessage(commentError.message);
+        setFetchError(commentError.message);
       }
 
       if (isMounted) {
@@ -284,7 +288,7 @@ export default function RantCommentsScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id, session?.user?.id]);
+  }, [id, session?.user?.id, reloadKey]);
 
   useEffect(() => {
     if (!id) return;
@@ -675,43 +679,62 @@ export default function RantCommentsScreen() {
           </View> */}
             {/* Rant Card */}
             <View className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4">
-              <AppText className="text-sm font-semibold mb-2.5 text-slate-900 dark:text-slate-100">
-                Rant #{id ?? "-"}
-              </AppText>
-
-              {rant ? (
-                <View className="mb-3 flex-row items-center">
-                  <View className="h-9 w-9 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                    <Image
-                      source={{
-                        uri: rant.is_anonymous
-                          ? "https://placehold.co/40x40/png"
-                          : (author?.avatar_url ?? fallbackAvatar),
-                      }}
-                      className="h-full w-full"
-                      resizeMode="cover"
-                    />
+              {isLoading && !rant ? (
+                <View>
+                  <SkeletonBlock className="h-4 w-24 rounded-md" />
+                  <View className="mt-3 flex-row items-center gap-2">
+                    <SkeletonBlock className="h-9 w-9 rounded-full" />
+                    <View className="flex-1 gap-2">
+                      <SkeletonBlock className="h-3 w-1/3 rounded-md" />
+                      <SkeletonBlock className="h-3 w-1/4 rounded-md" />
+                    </View>
                   </View>
-                  <View className="ml-2">
-                    <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {rant.is_anonymous
-                        ? "Anonymous Student"
-                        : author?.full_name || author?.username || "Student"}
-                    </AppText>
-                    {!rant.is_anonymous && author?.username ? (
-                      <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                        @{author.username}
-                      </AppText>
-                    ) : null}
+                  <View className="mt-3 gap-2">
+                    <SkeletonBlock className="h-4 w-full rounded-md" />
+                    <SkeletonBlock className="h-4 w-5/6 rounded-md" />
                   </View>
                 </View>
-              ) : null}
+              ) : (
+                <>
+                  <AppText className="text-sm font-semibold mb-2.5 text-slate-900 dark:text-slate-100">
+                    Rant #{id ?? "-"}
+                  </AppText>
 
-              <AppText className="text-[15px] leading-[22px] text-slate-900 dark:text-slate-100">
-                {isLoading
-                  ? "Loading rant..."
-                  : (rant?.content ?? "Rant not found.")}
-              </AppText>
+                  {rant ? (
+                    <View className="mb-3 flex-row items-center">
+                      <View className="h-9 w-9 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                        <Image
+                          source={{
+                            uri: rant.is_anonymous
+                              ? "https://placehold.co/40x40/png"
+                              : (author?.avatar_url ?? fallbackAvatar),
+                          }}
+                          className="h-full w-full"
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <View className="ml-2">
+                        <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {rant.is_anonymous
+                            ? "Anonymous Student"
+                            : author?.full_name ||
+                              author?.username ||
+                              "Student"}
+                        </AppText>
+                        {!rant.is_anonymous && author?.username ? (
+                          <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                            @{author.username}
+                          </AppText>
+                        ) : null}
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <AppText className="text-[15px] leading-[22px] text-slate-900 dark:text-slate-100">
+                    {rant?.content ?? "Rant not found."}
+                  </AppText>
+                </>
+              )}
               {rant ? (
                 <View className="mt-3 flex-row items-center gap-2">
                   <AppText className="text-xs text-slate-400 dark:text-slate-500">
@@ -741,7 +764,24 @@ export default function RantCommentsScreen() {
             ) : null}
 
             {/* Comments */}
-            {rootComments.map((comment) => renderComment(comment, 0))}
+            {isLoading && comments.length === 0
+              ? Array.from({ length: 3 }).map((_, index) => (
+                  <View
+                    key={`comment-skeleton-${index}`}
+                    className="py-3.5 border-b border-slate-200 dark:border-slate-800"
+                  >
+                    <View className="flex-row items-center gap-2">
+                      <SkeletonBlock className="h-9 w-9 rounded-full" />
+                      <View className="flex-1 gap-2">
+                        <SkeletonBlock className="h-3 w-1/3 rounded-md" />
+                        <SkeletonBlock className="h-3 w-1/4 rounded-md" />
+                      </View>
+                    </View>
+                    <SkeletonBlock className="mt-3 h-3 w-full rounded-md" />
+                    <SkeletonBlock className="mt-2 h-3 w-5/6 rounded-md" />
+                  </View>
+                ))
+              : rootComments.map((comment) => renderComment(comment, 0))}
           </ScrollView>
 
           {/* Input Bar */}
@@ -797,6 +837,13 @@ export default function RantCommentsScreen() {
             </Pressable>
           </View>
         </View>
+
+        <FetchErrorModal
+          visible={Boolean(fetchError)}
+          message={fetchError}
+          onClose={() => setFetchError(null)}
+          onRetry={() => setReloadKey((prev) => prev + 1)}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
