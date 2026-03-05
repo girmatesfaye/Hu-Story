@@ -22,6 +22,7 @@ import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
 import { useColorScheme } from "react-native";
 import { supabase } from "../../lib/supabase";
+import AntDesign from "@expo/vector-icons/build/AntDesign";
 
 const categories = [
   "All",
@@ -431,10 +432,10 @@ export default function SpotsTabScreen() {
       {unreadCount > 0 ? (
         <Pressable
           onPress={handleJumpToFirstUnread}
-          className="absolute right-6 bottom-24 min-h-10 px-3 rounded-full items-center justify-center bg-slate-900 dark:bg-slate-100"
+          className="absolute right-8 bottom-24 min-h-10 px-3 rounded-full items-center justify-center bg-slate-900 dark:bg-slate-100"
         >
           <AppText className="text-sm font-semibold text-white dark:text-slate-900">
-            ⬇ {unreadCount}
+            <AntDesign name="down" size={10} color="white" /> {unreadCount}
           </AppText>
         </Pressable>
       ) : null}
