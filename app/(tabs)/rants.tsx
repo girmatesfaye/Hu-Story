@@ -515,7 +515,7 @@ export default function RantsScreen() {
       {/* FAB */}
       <Pressable
         onPress={() => router.push("/rants/create-rants")}
-        className="absolute right-5 bottom-5 w-14 h-14 rounded-full items-center justify-center bg-green-600 dark:bg-green-400 shadow-lg"
+        className="absolute right-6 bottom-6 w-14 h-14 rounded-full items-center justify-center bg-green-600 dark:bg-green-400 shadow-lg"
       >
         <Ionicons name="add" size={26} color={iconColors.chipText} />
       </Pressable>

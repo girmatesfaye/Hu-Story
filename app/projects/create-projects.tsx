@@ -10,7 +10,9 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
+import { TopToast } from "../../components/TopToast";
 import { useTheme } from "../../hooks/useTheme";
+import { useTopToast } from "../../hooks/useTopToast";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Pressable } from "react-native";
 import { useState } from "react";
@@ -30,12 +32,12 @@ export default function CreateProjectsScreen() {
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { toast, showToast } = useTopToast();
 
   const handlePickCover = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      setErrorMessage("Permission needed to select a cover image.");
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
@@ -68,7 +70,7 @@ export default function CreateProjectsScreen() {
         .upload(filePath, fileData, { contentType, upsert: false });
 
       if (uploadError) {
-        setErrorMessage(uploadError.message);
+        showToast("Something went wrong. Please try again.", "error");
         return null;
       }
 
@@ -85,17 +87,16 @@ export default function CreateProjectsScreen() {
 
   const handleSubmit = async () => {
     if (!session?.user) {
-      setErrorMessage("Please log in to publish a project.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     if (!title.trim()) {
-      setErrorMessage("Add a project title.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
 
     const tags = tagsText
       .split(",")
@@ -118,16 +119,24 @@ export default function CreateProjectsScreen() {
     setIsSubmitting(false);
 
     if (error) {
-      setErrorMessage(error.message);
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
-    router.replace("/(tabs)/projects");
+    showToast("Successfully created.", "success");
+    setTimeout(() => {
+      router.replace("/(tabs)/projects");
+    }, 700);
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1 bg-white dark:bg-slate-950">
+        <TopToast
+          visible={toast.visible}
+          message={toast.message}
+          variant={toast.variant}
+        />
         <StatusBar style={statusBarStyle} />
         <View className="flex-row items-center justify-between px-5 pb-3 pt-6">
           <TouchableOpacity
@@ -296,12 +305,6 @@ export default function CreateProjectsScreen() {
               )}
             </TouchableOpacity>
           </View>
-
-          {errorMessage ? (
-            <AppText className="mt-4 text-sm text-red-500">
-              {errorMessage}
-            </AppText>
-          ) : null}
         </ScrollView>
 
         <View className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">

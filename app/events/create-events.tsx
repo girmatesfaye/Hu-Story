@@ -18,7 +18,9 @@ import DateTimePicker, {
 import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
+import { TopToast } from "../../components/TopToast";
 import { useTheme } from "../../hooks/useTheme";
+import { useTopToast } from "../../hooks/useTopToast";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
@@ -130,8 +132,8 @@ export default function CreateEventScreen() {
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const { toast, showToast } = useTopToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -185,7 +187,7 @@ export default function CreateEventScreen() {
   const handlePickCover = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      setErrorMessage("Permission needed to select a cover image.");
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
@@ -218,7 +220,7 @@ export default function CreateEventScreen() {
         .upload(filePath, fileData, { contentType, upsert: false });
 
       if (uploadError) {
-        setErrorMessage(uploadError.message);
+        showToast("Something went wrong. Please try again.", "error");
         return null;
       }
 
@@ -297,28 +299,28 @@ export default function CreateEventScreen() {
 
   const handleSubmit = async () => {
     if (!session?.user) {
-      setErrorMessage("Please log in to create an event.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     if (!title.trim()) {
-      setErrorMessage("Add a title for your event.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     if (feeType === "paid" && !feeAmount.trim()) {
-      setErrorMessage("Enter the entry fee amount.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     const parsedFee = feeAmount.trim() ? Number(feeAmount.trim()) : null;
     if (feeType === "paid" && (parsedFee === null || Number.isNaN(parsedFee))) {
-      setErrorMessage("Entry fee must be a number.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
     if (startAt && endAt && endAt.getTime() < startAt.getTime()) {
-      setErrorMessage("End date/time cannot be earlier than start date/time.");
+      showToast("Please fill all required fields.", "error");
       return;
     }
 
@@ -326,7 +328,6 @@ export default function CreateEventScreen() {
     const endAtValue = endAt ? toIsoWithOffset(endAt) : null;
 
     setIsSubmitting(true);
-    setErrorMessage(null);
 
     const coverUrl = coverImageUri ? await uploadCoverImage() : coverImageUrl;
     if (coverImageUri && !coverUrl) {
@@ -360,16 +361,24 @@ export default function CreateEventScreen() {
     setIsSubmitting(false);
 
     if (error) {
-      setErrorMessage(error.message);
+      showToast("Something went wrong. Please try again.", "error");
       return;
     }
 
-    router.replace("/(tabs)/events");
+    showToast("Successfully created.", "success");
+    setTimeout(() => {
+      router.replace("/(tabs)/events");
+    }, 700);
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1">
+        <TopToast
+          visible={toast.visible}
+          message={toast.message}
+          variant={toast.variant}
+        />
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View className="flex-1 bg-white dark:bg-slate-950">
             {/* Header */}
@@ -726,12 +735,6 @@ export default function CreateEventScreen() {
                         onChangeText={setDetails}
                       />
                     </View>
-
-                    {errorMessage ? (
-                      <AppText className="mt-4 text-sm text-red-500">
-                        {errorMessage}
-                      </AppText>
-                    ) : null}
                   </>
                 )}
               </View>
