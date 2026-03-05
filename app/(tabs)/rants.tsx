@@ -14,7 +14,18 @@ import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 
-const chips = ["All Rants", "Academics", "Dorms", "Cafeteria", "Spots"];
+const chips = [
+  "All Rants",
+  "Campus Life",
+  "Cafeteria",
+  "Academics",
+  "Dorms",
+  "Relationships",
+  "Sexual",
+  "Mental",
+  "Family",
+  "Other",
+];
 
 type RantItem = {
   id: string;

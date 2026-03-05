@@ -8,7 +8,18 @@ import { useTheme } from "../../hooks/useTheme";
 import { useColorScheme } from "react-native";
 import { supabase } from "../../lib/supabase";
 
-const categories = ["All", "Food", "Hangout", "Game", "Study"];
+const categories = [
+  "All",
+  "Food",
+  "Hangout",
+  "Game",
+  "Study",
+  "Date Spots",
+  "Quiet Areas",
+  "Outdoor",
+  "Cheap Eats",
+  "Other",
+];
 
 type SpotItem = {
   id: string;
