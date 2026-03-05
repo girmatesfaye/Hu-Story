@@ -1,5 +1,19 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+  ViewToken,
+} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
@@ -211,6 +225,10 @@ export default function EventTabScreen() {
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [feeFilter, setFeeFilter] = useState<"All" | "Free" | "Paid">("All");
+  const [lastVisibleIndex, setLastVisibleIndex] = useState(-1);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const flatListRef = useRef<FlatList<EventItem>>(null);
+  const eventsLengthRef = useRef(0);
 
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
@@ -275,132 +293,338 @@ export default function EventTabScreen() {
     return { todayEvents: todayList, nextWeekEvents: nextList };
   }, [events, feeFilter]);
 
+  const visibleEvents = useMemo(
+    () => [...todayEvents, ...nextWeekEvents],
+    [todayEvents, nextWeekEvents],
+  );
+
+  useEffect(() => {
+    eventsLengthRef.current = visibleEvents.length;
+    const nextUnread =
+      lastVisibleIndex >= 0
+        ? Math.max(visibleEvents.length - lastVisibleIndex - 1, 0)
+        : 0;
+    setUnreadCount(nextUnread);
+  }, [lastVisibleIndex, visibleEvents.length]);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+  });
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const indexes = viewableItems
+        .map((item) => item.index)
+        .filter((index): index is number => typeof index === "number");
+
+      if (indexes.length === 0) return;
+
+      const nextLastVisibleIndex = Math.max(...indexes);
+      setLastVisibleIndex(nextLastVisibleIndex);
+      setUnreadCount(
+        Math.max(eventsLengthRef.current - nextLastVisibleIndex - 1, 0),
+      );
+    },
+  );
+
+  const handleJumpToFirstUnread = useCallback(() => {
+    if (!flatListRef.current || unreadCount <= 0) return;
+
+    const targetIndex = Math.min(
+      lastVisibleIndex + 1,
+      visibleEvents.length - 1,
+    );
+    if (targetIndex < 0) return;
+
+    flatListRef.current.scrollToIndex({
+      index: targetIndex,
+      animated: true,
+      viewPosition: 0.1,
+    });
+  }, [lastVisibleIndex, unreadCount, visibleEvents.length]);
+
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
-      <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <AppText className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-              Upcoming Events
-            </AppText>
-            <AppText className="text-sm text-slate-500  dark:text-green-400">
-              Discover what's happening around campus
-            </AppText>
+      {isLoading ? (
+        <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
+          <View className="flex-row items-center justify-between">
+            <View>
+              <AppText className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                Upcoming Events
+              </AppText>
+              <AppText className="text-sm text-slate-500  dark:text-green-400">
+                Discover what's happening around campus
+              </AppText>
+            </View>
+            <Pressable
+              onPress={() => router.push("../notifications/notification")}
+              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={iconColors.text}
+              />
+            </Pressable>
           </View>
-          <Pressable
-            onPress={() => router.push("../notifications/notification")}
-            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={22}
-              color={iconColors.text}
-            />
-          </Pressable>
-        </View>
 
-        <View className="mt-4 flex-row items-center gap-3">
-          <View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-            <Ionicons
-              name="search-outline"
-              size={18}
-              color={colors.mutedText}
-            />
-            <TextInput
-              placeholder="Search events, clubs..."
-              placeholderTextColor={colors.mutedStrong}
-              className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-            />
+          <View className="mt-4 flex-row items-center gap-3">
+            <View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+              <Ionicons
+                name="search-outline"
+                size={18}
+                color={colors.mutedText}
+              />
+              <TextInput
+                placeholder="Search events, clubs..."
+                placeholderTextColor={colors.mutedStrong}
+                className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+              />
+            </View>
+            <Pressable
+              onPress={() => setShowFilters((prev) => !prev)}
+              className="h-12 w-12 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-400/20"
+            >
+              <Ionicons
+                name="options-outline"
+                size={20}
+                color={colors.accent}
+              />
+            </Pressable>
           </View>
-          <Pressable
-            onPress={() => setShowFilters((prev) => !prev)}
-            className="h-12 w-12 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-400/20"
-          >
-            <Ionicons name="options-outline" size={20} color={colors.accent} />
-          </Pressable>
-        </View>
 
-        {showFilters ? (
-          <View className="mt-3 flex-row gap-2">
-            {(["All", "Free", "Paid"] as const).map((option) => {
-              const isActive = feeFilter === option;
-              return (
-                <Pressable
-                  key={option}
-                  onPress={() => setFeeFilter(option)}
-                  className={`rounded-full px-4 py-2 ${
-                    isActive ? "bg-green-600" : "bg-slate-100 dark:bg-slate-900"
-                  }`}
-                >
-                  <AppText
-                    className={`text-xs font-semibold ${
+          {showFilters ? (
+            <View className="mt-3 flex-row gap-2">
+              {(["All", "Free", "Paid"] as const).map((option) => {
+                const isActive = feeFilter === option;
+                return (
+                  <Pressable
+                    key={option}
+                    onPress={() => setFeeFilter(option)}
+                    className={`rounded-full px-4 py-2 ${
                       isActive
-                        ? "text-white"
-                        : "text-slate-600 dark:text-slate-300"
+                        ? "bg-green-600"
+                        : "bg-slate-100 dark:bg-slate-900"
                     }`}
                   >
-                    {option}
-                  </AppText>
-                </Pressable>
-              );
-            })}
+                    <AppText
+                      className={`text-xs font-semibold ${
+                        isActive
+                          ? "text-white"
+                          : "text-slate-600 dark:text-slate-300"
+                      }`}
+                    >
+                      {option}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="mt-5 gap-3"
+          >
+            {dateChips.map((chip, index) => (
+              <Pressable
+                key={chip.id}
+                onPress={() => setSelectedDateIndex(index)}
+                className={`h-16 w-16 items-center justify-center rounded-2xl border ${
+                  index === selectedDateIndex
+                    ? "border-green-600 bg-green-600"
+                    : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                }`}
+              >
+                <AppText
+                  className={`text-[11px] font-semibold ${
+                    index === selectedDateIndex
+                      ? "text-white"
+                      : "text-slate-400 dark:text-slate-500"
+                  }`}
+                >
+                  {chip.day}
+                </AppText>
+                <AppText
+                  className={`text-lg font-semibold ${
+                    index === selectedDateIndex
+                      ? "text-white"
+                      : "text-slate-900 dark:text-slate-100"
+                  }`}
+                >
+                  {chip.date}
+                </AppText>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <View className="mt-6 flex-row items-center justify-between">
+            <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Today
+            </AppText>
+            <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
+              {todayEvents.length} Events
+            </AppText>
           </View>
-        ) : null}
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerClassName="mt-5 gap-3"
-        >
-          {dateChips.map((chip, index) => (
-            <Pressable
-              key={chip.id}
-              onPress={() => setSelectedDateIndex(index)}
-              className={`h-16 w-16 items-center justify-center rounded-2xl border ${
-                index === selectedDateIndex
-                  ? "border-green-600 bg-green-600"
-                  : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-              }`}
-            >
-              <AppText
-                className={`text-[11px] font-semibold ${
-                  index === selectedDateIndex
-                    ? "text-white"
-                    : "text-slate-400 dark:text-slate-500"
-                }`}
-              >
-                {chip.day}
-              </AppText>
-              <AppText
-                className={`text-lg font-semibold ${
-                  index === selectedDateIndex
-                    ? "text-white"
-                    : "text-slate-900 dark:text-slate-100"
-                }`}
-              >
-                {chip.date}
-              </AppText>
-            </Pressable>
-          ))}
+          <View className="mt-3 gap-4">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <EventCardSkeleton key={`event-skeleton-${index}`} />
+            ))}
+          </View>
         </ScrollView>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={visibleEvents}
+          keyExtractor={(item) => item.id}
+          contentContainerClassName="px-5 pb-28 pt-4"
+          viewabilityConfig={viewabilityConfig.current}
+          onViewableItemsChanged={onViewableItemsChanged.current}
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            const offset = Math.max(index * averageItemLength, 0);
+            flatListRef.current?.scrollToOffset({ offset, animated: true });
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index, animated: true });
+            }, 120);
+          }}
+          ListHeaderComponent={
+            <>
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <AppText className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                    Upcoming Events
+                  </AppText>
+                  <AppText className="text-sm text-slate-500  dark:text-green-400">
+                    Discover what's happening around campus
+                  </AppText>
+                </View>
+                <Pressable
+                  onPress={() => router.push("../notifications/notification")}
+                  className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+                >
+                  <Ionicons
+                    name="notifications-outline"
+                    size={22}
+                    color={iconColors.text}
+                  />
+                </Pressable>
+              </View>
 
-        <View className="mt-6 flex-row items-center justify-between">
-          <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Today
-          </AppText>
-          <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-            {todayEvents.length} Events
-          </AppText>
-        </View>
+              <View className="mt-4 flex-row items-center gap-3">
+                <View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                  <Ionicons
+                    name="search-outline"
+                    size={18}
+                    color={colors.mutedText}
+                  />
+                  <TextInput
+                    placeholder="Search events, clubs..."
+                    placeholderTextColor={colors.mutedStrong}
+                    className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                  />
+                </View>
+                <Pressable
+                  onPress={() => setShowFilters((prev) => !prev)}
+                  className="h-12 w-12 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-400/20"
+                >
+                  <Ionicons
+                    name="options-outline"
+                    size={20}
+                    color={colors.accent}
+                  />
+                </Pressable>
+              </View>
 
-        <View className="mt-3 gap-4">
-          {isLoading
-            ? Array.from({ length: 2 }).map((_, index) => (
-                <EventCardSkeleton key={`today-skeleton-${index}`} />
-              ))
-            : todayEvents.map((event) => (
+              {showFilters ? (
+                <View className="mt-3 flex-row gap-2">
+                  {(["All", "Free", "Paid"] as const).map((option) => {
+                    const isActive = feeFilter === option;
+                    return (
+                      <Pressable
+                        key={option}
+                        onPress={() => setFeeFilter(option)}
+                        className={`rounded-full px-4 py-2 ${
+                          isActive
+                            ? "bg-green-600"
+                            : "bg-slate-100 dark:bg-slate-900"
+                        }`}
+                      >
+                        <AppText
+                          className={`text-xs font-semibold ${
+                            isActive
+                              ? "text-white"
+                              : "text-slate-600 dark:text-slate-300"
+                          }`}
+                        >
+                          {option}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName="mt-5 gap-3"
+              >
+                {dateChips.map((chip, index) => (
+                  <Pressable
+                    key={chip.id}
+                    onPress={() => setSelectedDateIndex(index)}
+                    className={`h-16 w-16 items-center justify-center rounded-2xl border ${
+                      index === selectedDateIndex
+                        ? "border-green-600 bg-green-600"
+                        : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+                    }`}
+                  >
+                    <AppText
+                      className={`text-[11px] font-semibold ${
+                        index === selectedDateIndex
+                          ? "text-white"
+                          : "text-slate-400 dark:text-slate-500"
+                      }`}
+                    >
+                      {chip.day}
+                    </AppText>
+                    <AppText
+                      className={`text-lg font-semibold ${
+                        index === selectedDateIndex
+                          ? "text-white"
+                          : "text-slate-900 dark:text-slate-100"
+                      }`}
+                    >
+                      {chip.date}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              <View className="mt-6 flex-row items-center justify-between">
+                <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Today
+                </AppText>
+                <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
+                  {todayEvents.length} Events
+                </AppText>
+              </View>
+              <View className="h-3" />
+            </>
+          }
+          renderItem={({ item: event, index }) => (
+            <>
+              {index === todayEvents.length ? (
+                <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Next Week
+                </AppText>
+              ) : null}
+              <View
+                className={index === todayEvents.length ? "mt-3" : undefined}
+              >
                 <EventCard
-                  key={event.id}
                   title={event.title}
                   time={formatEventDateRange(event.start_at, event.end_at)}
                   location={event.location ?? "Location TBD"}
@@ -414,54 +638,45 @@ export default function EventTabScreen() {
                   image={
                     resolveEventCoverUrl(event.cover_url) ?? fallbackEventImage
                   }
-                  badge="Today"
+                  badge={index < todayEvents.length ? "Today" : undefined}
                   host={event.host_name ? `By ${event.host_name}` : undefined}
                   iconColor={iconColor}
                   onPress={() => router.push(`../events/${event.id}`)}
                 />
-              ))}
-        </View>
+              </View>
+            </>
+          )}
+          ItemSeparatorComponent={() => <View className="h-4" />}
+          ListFooterComponent={
+            <>
+              {nextWeekEvents.length === 0 ? (
+                <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Next Week
+                </AppText>
+              ) : null}
+              <View className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+                <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Create your own event
+                </AppText>
+                <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Promote your club and invite students in minutes.
+                </AppText>
+              </View>
+            </>
+          }
+        />
+      )}
 
-        <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Next Week
-        </AppText>
-        <View className="mt-3 gap-4">
-          {isLoading
-            ? Array.from({ length: 3 }).map((_, index) => (
-                <EventCardSkeleton key={`next-skeleton-${index}`} />
-              ))
-            : nextWeekEvents.map((event) => (
-                <EventCard
-                  key={event.id}
-                  title={event.title}
-                  time={formatEventDateRange(event.start_at, event.end_at)}
-                  location={event.location ?? "Location TBD"}
-                  price={
-                    event.fee_type?.toLowerCase() === "paid"
-                      ? event.fee_amount
-                        ? `${event.fee_amount} ETB`
-                        : "Paid"
-                      : "Free"
-                  }
-                  image={
-                    resolveEventCoverUrl(event.cover_url) ?? fallbackEventImage
-                  }
-                  host={event.host_name ? `By ${event.host_name}` : undefined}
-                  iconColor={iconColor}
-                  onPress={() => router.push(`../events/${event.id}`)}
-                />
-              ))}
-        </View>
-
-        <View className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-          <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Create your own event
+      {unreadCount > 0 ? (
+        <Pressable
+          onPress={handleJumpToFirstUnread}
+          className="absolute right-6 bottom-24 min-h-10 px-3 rounded-full items-center justify-center bg-slate-900 dark:bg-slate-100"
+        >
+          <AppText className="text-sm font-semibold text-white dark:text-slate-900">
+            ⬇ {unreadCount}
           </AppText>
-          <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Promote your club and invite students in minutes.
-          </AppText>
-        </View>
-      </ScrollView>
+        </Pressable>
+      ) : null}
 
       <Pressable
         onPress={() => router.push("/events/create-events")}

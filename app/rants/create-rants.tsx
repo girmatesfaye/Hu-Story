@@ -163,7 +163,7 @@ export default function CreateRantScreen() {
 
       <View className="px-5 pb-6">
         <Pressable
-          className={`bg-green-600 dark:bg-green-400 rounded-2xl py-4 items-center justify-center shadow-lg ${
+          className={`bg-green-600 dark:bg-green-600 rounded-2xl py-4 items-center justify-center shadow-lg ${
             isSubmitting ? "opacity-60" : ""
           }`}
           onPress={handleSubmit}

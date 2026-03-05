@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  FlatList,
   ScrollView,
   View,
   Pressable,
   Image,
+  ViewToken,
   useColorScheme,
 } from "react-native";
 import { AppText } from "../../components/AppText";
@@ -100,6 +102,10 @@ export default function RantsScreen() {
   const [rants, setRants] = useState<RantItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastVisibleIndex, setLastVisibleIndex] = useState(-1);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const flatListRef = useRef<FlatList<RantItem>>(null);
+  const rantsLengthRef = useRef(0);
   const scheme = useColorScheme();
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
@@ -211,6 +217,51 @@ export default function RantsScreen() {
     }, [loadRants]),
   );
 
+  useEffect(() => {
+    rantsLengthRef.current = rants.length;
+    const nextUnread =
+      lastVisibleIndex >= 0
+        ? Math.max(rants.length - lastVisibleIndex - 1, 0)
+        : 0;
+    setUnreadCount(nextUnread);
+  }, [lastVisibleIndex, rants.length]);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+  });
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const indexes = viewableItems
+        .map((item) => item.index)
+        .filter((index): index is number => typeof index === "number");
+
+      if (indexes.length === 0) return;
+
+      const nextLastVisibleIndex = Math.max(...indexes);
+      setLastVisibleIndex(nextLastVisibleIndex);
+
+      const nextUnread = Math.max(
+        rantsLengthRef.current - nextLastVisibleIndex - 1,
+        0,
+      );
+      setUnreadCount(nextUnread);
+    },
+  );
+
+  const handleJumpToFirstUnread = useCallback(() => {
+    if (!flatListRef.current || unreadCount <= 0) return;
+
+    const targetIndex = Math.min(lastVisibleIndex + 1, rants.length - 1);
+    if (targetIndex < 0) return;
+
+    flatListRef.current.scrollToIndex({
+      index: targetIndex,
+      animated: true,
+      viewPosition: 0.1,
+    });
+  }, [lastVisibleIndex, rants.length, unreadCount]);
+
   const handleReportSubmit = async (reason: string, details: string) => {
     if (!session?.user?.id) {
       setErrorMessage("Please log in to report content.");
@@ -318,200 +369,281 @@ export default function RantsScreen() {
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
-      <ScrollView contentContainerClassName="px-5 pt-5 pb-20">
-        {/* Header */}
-        <View className="flex-row items-center justify-between mb-4">
-          <View>
-            <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
-              HU Rants
-            </AppText>
-            <AppText className="text-xs mt-[2px] text-slate-500  dark:text-green-400">
-              Hawassa University Anonymous Feed
-            </AppText>
+      {isLoading ? (
+        <ScrollView contentContainerClassName="px-5 pt-5 pb-20">
+          <View className="flex-row items-center justify-between mb-4">
+            <View>
+              <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
+                HU Rants
+              </AppText>
+              <AppText className="text-xs mt-[2px] text-slate-500  dark:text-green-400">
+                Hawassa University Anonymous Feed
+              </AppText>
+            </View>
+
+            <Pressable
+              onPress={() => router.push("../notifications/notification")}
+              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={iconColors.text}
+              />
+            </Pressable>
           </View>
 
-          <Pressable
-            onPress={() => router.push("../notifications/notification")}
-            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="gap-2 pb-1"
           >
-            <Ionicons
-              name="notifications-outline"
-              size={22}
-              color={iconColors.text}
-            />
-          </Pressable>
-        </View>
-
-        {/* Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerClassName="gap-2 pb-1"
-        >
-          {chips.map((chip) => {
-            const active = chip === activeChip;
-            return (
-              <View
-                key={chip}
-                className={`px-4 py-2 rounded-full border ${
-                  active
-                    ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
-                    : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
-                }`}
-                onTouchEnd={() => setActiveChip(chip)}
-              >
-                <AppText
-                  className={`text-xs ${
-                    active
-                      ? "text-white dark:text-slate-950"
-                      : "text-slate-600 dark:text-slate-300"
-                  }`}
-                >
-                  {chip}
-                </AppText>
-              </View>
-            );
-          })}
-        </ScrollView>
-
-        {/* Cards */}
-        <View className="mt-3 gap-4">
-          {isLoading
-            ? Array.from({ length: 4 }).map((_, index) => (
-                <RantCardSkeleton key={`rant-skeleton-${index}`} />
-              ))
-            : rants.map((rant) => (
+            {chips.map((chip) => {
+              const active = chip === activeChip;
+              return (
                 <View
-                  key={rant.id}
-                  className="rounded-2xl p-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
+                  key={chip}
+                  className={`px-4 py-2 rounded-full border ${
+                    active
+                      ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
+                      : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
+                  }`}
+                  onTouchEnd={() => setActiveChip(chip)}
                 >
-                  {/* Card Header */}
-                  <View className="flex-row items-center mb-3">
-                    <View className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
-                      <Image
-                        source={{
-                          uri: rant.is_anonymous
-                            ? "https://placehold.co/40x40/png"
-                            : (rant.profile?.avatar_url ?? fallbackAvatar),
-                        }}
-                        className="w-full h-full"
-                      />
-                    </View>
+                  <AppText
+                    className={`text-xs ${
+                      active
+                        ? "text-white dark:text-slate-950"
+                        : "text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {chip}
+                  </AppText>
+                </View>
+              );
+            })}
+          </ScrollView>
 
-                    <View className="flex-1 ml-2.5">
-                      <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {rant.is_anonymous
-                          ? "Anonymous Student"
-                          : rant.profile?.full_name ||
-                            rant.profile?.username ||
-                            "Student"}
-                      </AppText>
+          <View className="mt-3 gap-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <RantCardSkeleton key={`rant-skeleton-${index}`} />
+            ))}
+          </View>
+        </ScrollView>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={rants}
+          keyExtractor={(item) => item.id}
+          contentContainerClassName="px-5 pt-5 pb-20"
+          viewabilityConfig={viewabilityConfig.current}
+          onViewableItemsChanged={onViewableItemsChanged.current}
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            const offset = Math.max(index * averageItemLength, 0);
+            flatListRef.current?.scrollToOffset({ offset, animated: true });
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index, animated: true });
+            }, 120);
+          }}
+          ListHeaderComponent={
+            <>
+              <View className="flex-row items-center justify-between mb-4">
+                <View>
+                  <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
+                    HU Rants
+                  </AppText>
+                  <AppText className="text-xs mt-[2px] text-slate-500  dark:text-green-400">
+                    Hawassa University Anonymous Feed
+                  </AppText>
+                </View>
 
-                      <View className="flex-row items-center mt-0.5">
-                        <AppText className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {formatTimeAgo(rant.created_at)}
-                        </AppText>
-                        <View className="w-1 h-1 rounded-full mx-1.5 bg-slate-200 dark:bg-slate-800" />
-                        <AppText className="text-[11px] text-green-600 dark:text-green-400">
-                          {rant.category ?? "General"}
-                        </AppText>
-                      </View>
-                    </View>
+                <Pressable
+                  onPress={() => router.push("../notifications/notification")}
+                  className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+                >
+                  <Ionicons
+                    name="notifications-outline"
+                    size={22}
+                    color={iconColors.text}
+                  />
+                </Pressable>
+              </View>
 
-                    <Pressable
-                      className="p-1"
-                      onPress={() => {
-                        setSelectedReportId(rant.id);
-                        setIsReportOpen(true);
-                      }}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName="gap-2 pb-1"
+              >
+                {chips.map((chip) => {
+                  const active = chip === activeChip;
+                  return (
+                    <View
+                      key={chip}
+                      className={`px-4 py-2 rounded-full border ${
+                        active
+                          ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
+                          : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
+                      }`}
+                      onTouchEnd={() => setActiveChip(chip)}
                     >
-                      <Ionicons
-                        name="ellipsis-horizontal"
-                        size={20}
-                        color={iconColors.muted}
-                      />
-                    </Pressable>
-                  </View>
+                      <AppText
+                        className={`text-xs ${
+                          active
+                            ? "text-white dark:text-slate-950"
+                            : "text-slate-600 dark:text-slate-300"
+                        }`}
+                      >
+                        {chip}
+                      </AppText>
+                    </View>
+                  );
+                })}
+              </ScrollView>
 
-                  {/* Content */}
-                  <AppText className="text-sm leading-5 text-slate-900 dark:text-slate-100">
-                    {rant.content}
+              <View className="h-3" />
+            </>
+          }
+          renderItem={({ item: rant }) => (
+            <View className="rounded-2xl p-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+              {/* Card Header */}
+              <View className="flex-row items-center mb-3">
+                <View className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
+                  <Image
+                    source={{
+                      uri: rant.is_anonymous
+                        ? "https://placehold.co/40x40/png"
+                        : (rant.profile?.avatar_url ?? fallbackAvatar),
+                    }}
+                    className="w-full h-full"
+                  />
+                </View>
+
+                <View className="flex-1 ml-2.5">
+                  <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {rant.is_anonymous
+                      ? "Anonymous Student"
+                      : rant.profile?.full_name ||
+                        rant.profile?.username ||
+                        "Student"}
                   </AppText>
 
-                  {/* Actions */}
-                  <View className="mt-3.5 flex-row items-center justify-between">
-                    <View className="flex-row items-center gap-4 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900">
-                      <Pressable
-                        onPress={() => handleVote(rant.id, 1)}
-                        className="flex-row items-center gap-1"
-                      >
-                        <Ionicons
-                          name="arrow-up"
-                          size={18}
-                          color={
-                            rant.user_vote === 1
-                              ? iconColors.accent
-                              : iconColors.muted
-                          }
-                        />
-                        <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
-                          {rant.upvotes}
-                        </AppText>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => handleVote(rant.id, -1)}
-                        className="flex-row items-center gap-1"
-                      >
-                        <Ionicons
-                          name="arrow-down"
-                          size={18}
-                          color={
-                            rant.user_vote === -1
-                              ? iconColors.danger
-                              : iconColors.muted
-                          }
-                        />
-                        <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
-                          {rant.downvotes}
-                        </AppText>
-                      </Pressable>
-                    </View>
-
-                    <View className="flex-row items-center gap-3">
-                      <View className="flex-row items-center gap-1">
-                        <Ionicons
-                          name="eye-outline"
-                          size={15}
-                          color={iconColors.muted}
-                        />
-                        <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                          {rant.views}
-                        </AppText>
-                      </View>
-
-                      <Pressable
-                        onPress={() => router.push(`/rants/${rant.id}`)}
-                        className="flex-row items-center gap-1.5 px-2 py-1.5 rounded-lg"
-                      >
-                        <Ionicons
-                          name="chatbox-outline"
-                          size={16}
-                          color={iconColors.muted}
-                        />
-                        <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                          {rant.comment_count} Comments
-                        </AppText>
-                      </Pressable>
-                    </View>
+                  <View className="flex-row items-center mt-0.5">
+                    <AppText className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {formatTimeAgo(rant.created_at)}
+                    </AppText>
+                    <View className="w-1 h-1 rounded-full mx-1.5 bg-slate-200 dark:bg-slate-800" />
+                    <AppText className="text-[11px] text-green-600 dark:text-green-400">
+                      {rant.category ?? "General"}
+                    </AppText>
                   </View>
                 </View>
-              ))}
-        </View>
 
-        <AppText className="text-xs text-center mt-4 text-slate-400 dark:text-slate-500">
-          You are all caught up!
-        </AppText>
-      </ScrollView>
+                <Pressable
+                  className="p-1"
+                  onPress={() => {
+                    setSelectedReportId(rant.id);
+                    setIsReportOpen(true);
+                  }}
+                >
+                  <Ionicons
+                    name="ellipsis-horizontal"
+                    size={20}
+                    color={iconColors.muted}
+                  />
+                </Pressable>
+              </View>
+
+              {/* Content */}
+              <AppText className="text-sm leading-5 text-slate-900 dark:text-slate-100">
+                {rant.content}
+              </AppText>
+
+              {/* Actions */}
+              <View className="mt-3.5 flex-row items-center justify-between">
+                <View className="flex-row items-center gap-4 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900">
+                  <Pressable
+                    onPress={() => handleVote(rant.id, 1)}
+                    className="flex-row items-center gap-1"
+                  >
+                    <Ionicons
+                      name="arrow-up"
+                      size={18}
+                      color={
+                        rant.user_vote === 1
+                          ? iconColors.accent
+                          : iconColors.muted
+                      }
+                    />
+                    <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
+                      {rant.upvotes}
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleVote(rant.id, -1)}
+                    className="flex-row items-center gap-1"
+                  >
+                    <Ionicons
+                      name="arrow-down"
+                      size={18}
+                      color={
+                        rant.user_vote === -1
+                          ? iconColors.danger
+                          : iconColors.muted
+                      }
+                    />
+                    <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
+                      {rant.downvotes}
+                    </AppText>
+                  </Pressable>
+                </View>
+
+                <View className="flex-row items-center gap-3">
+                  <View className="flex-row items-center gap-1">
+                    <Ionicons
+                      name="eye-outline"
+                      size={15}
+                      color={iconColors.muted}
+                    />
+                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                      {rant.views}
+                    </AppText>
+                  </View>
+
+                  <Pressable
+                    onPress={() => router.push(`/rants/${rant.id}`)}
+                    className="flex-row items-center gap-1.5 px-2 py-1.5 rounded-lg"
+                  >
+                    <Ionicons
+                      name="chatbox-outline"
+                      size={16}
+                      color={iconColors.muted}
+                    />
+                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                      {rant.comment_count} Comments
+                    </AppText>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          )}
+          ItemSeparatorComponent={() => <View className="h-4" />}
+          ListFooterComponent={
+            <AppText className="text-xs text-center mt-4 text-slate-400 dark:text-slate-500">
+              You are all caught up!
+            </AppText>
+          }
+        />
+      )}
+      {unreadCount > 0 ? (
+        <Pressable
+          onPress={handleJumpToFirstUnread}
+          className="absolute right-6 bottom-24 min-h-10 px-3 rounded-full items-center justify-center bg-slate-900 dark:bg-slate-100"
+        >
+          <AppText className="text-sm font-semibold text-white dark:text-slate-900">
+            ⬇ {unreadCount}
+          </AppText>
+        </Pressable>
+      ) : null}
       {/* FAB */}
       <Pressable
         onPress={() => router.push("/rants/create-rants")}
