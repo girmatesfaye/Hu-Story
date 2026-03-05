@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   FlatList,
   Image,
@@ -56,6 +62,7 @@ export default function SpotsTabScreen() {
   const { colors } = useTheme();
   const scheme = useColorScheme();
   const [activeCategory, setActiveCategory] = useState(categories[0]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [spots, setSpots] = useState<SpotItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -101,14 +108,31 @@ export default function SpotsTabScreen() {
     void loadSpots();
   }, [loadSpots]);
 
+  const visibleSpots = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) return spots;
+
+    return spots.filter((spot) => {
+      const name = spot.name.toLowerCase();
+      const category = (spot.category ?? "").toLowerCase();
+      const location = (spot.location ?? "").toLowerCase();
+
+      return (
+        name.includes(normalizedQuery) ||
+        category.includes(normalizedQuery) ||
+        location.includes(normalizedQuery)
+      );
+    });
+  }, [searchQuery, spots]);
+
   useEffect(() => {
-    spotsLengthRef.current = spots.length;
+    spotsLengthRef.current = visibleSpots.length;
     const nextUnread =
       highestSeenIndex >= 0
-        ? Math.max(spots.length - highestSeenIndex - 1, 0)
+        ? Math.max(visibleSpots.length - highestSeenIndex - 1, 0)
         : 0;
     setUnreadCount(nextUnread);
-  }, [highestSeenIndex, spots.length]);
+  }, [highestSeenIndex, visibleSpots.length]);
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 60,
@@ -141,7 +165,7 @@ export default function SpotsTabScreen() {
   const handleJumpToFirstUnread = useCallback(() => {
     if (!flatListRef.current || unreadCount <= 0) return;
 
-    const targetIndex = Math.min(highestSeenIndex + 1, spots.length - 1);
+    const targetIndex = Math.min(highestSeenIndex + 1, visibleSpots.length - 1);
     if (targetIndex < 0) return;
 
     flatListRef.current.scrollToIndex({
@@ -149,7 +173,7 @@ export default function SpotsTabScreen() {
       animated: true,
       viewPosition: 0.1,
     });
-  }, [highestSeenIndex, spots.length, unreadCount]);
+  }, [highestSeenIndex, unreadCount, visibleSpots.length]);
 
   const tagToneStyles: Record<string, { container: string; text: string }> = {
     food: { container: "bg-orange-100", text: "text-orange-700" },
@@ -191,6 +215,8 @@ export default function SpotsTabScreen() {
             />
             <TextInput
               placeholder="Find coffee, library, lunch..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
               placeholderTextColor={colors.mutedStrong}
               className="flex-1 text-sm text-slate-900 dark:text-slate-100"
             />
@@ -250,7 +276,7 @@ export default function SpotsTabScreen() {
       ) : (
         <FlatList
           ref={flatListRef}
-          data={spots}
+          data={visibleSpots}
           keyExtractor={(item) => item.id}
           contentContainerClassName="px-5 pb-28 pt-4"
           viewabilityConfig={viewabilityConfig.current}
@@ -293,6 +319,8 @@ export default function SpotsTabScreen() {
                 />
                 <TextInput
                   placeholder="Find coffee, library, lunch..."
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
                   placeholderTextColor={colors.mutedStrong}
                   className="flex-1 text-sm text-slate-900 dark:text-slate-100"
                 />
