@@ -102,7 +102,7 @@ export default function RantsScreen() {
   const [rants, setRants] = useState<RantItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lastVisibleIndex, setLastVisibleIndex] = useState(-1);
+  const [highestSeenIndex, setHighestSeenIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<RantItem>>(null);
   const rantsLengthRef = useRef(0);
@@ -220,11 +220,11 @@ export default function RantsScreen() {
   useEffect(() => {
     rantsLengthRef.current = rants.length;
     const nextUnread =
-      lastVisibleIndex >= 0
-        ? Math.max(rants.length - lastVisibleIndex - 1, 0)
+      highestSeenIndex >= 0
+        ? Math.max(rants.length - highestSeenIndex - 1, 0)
         : 0;
     setUnreadCount(nextUnread);
-  }, [lastVisibleIndex, rants.length]);
+  }, [highestSeenIndex, rants.length]);
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 60,
@@ -238,21 +238,26 @@ export default function RantsScreen() {
 
       if (indexes.length === 0) return;
 
-      const nextLastVisibleIndex = Math.max(...indexes);
-      setLastVisibleIndex(nextLastVisibleIndex);
-
-      const nextUnread = Math.max(
-        rantsLengthRef.current - nextLastVisibleIndex - 1,
-        0,
-      );
-      setUnreadCount(nextUnread);
+      const nextVisibleMaxIndex = Math.max(...indexes);
+      setHighestSeenIndex((previousHighestSeenIndex) => {
+        const nextHighestSeenIndex = Math.max(
+          previousHighestSeenIndex,
+          nextVisibleMaxIndex,
+        );
+        const nextUnread = Math.max(
+          rantsLengthRef.current - nextHighestSeenIndex - 1,
+          0,
+        );
+        setUnreadCount(nextUnread);
+        return nextHighestSeenIndex;
+      });
     },
   );
 
   const handleJumpToFirstUnread = useCallback(() => {
     if (!flatListRef.current || unreadCount <= 0) return;
 
-    const targetIndex = Math.min(lastVisibleIndex + 1, rants.length - 1);
+    const targetIndex = Math.min(highestSeenIndex + 1, rants.length - 1);
     if (targetIndex < 0) return;
 
     flatListRef.current.scrollToIndex({
@@ -260,7 +265,7 @@ export default function RantsScreen() {
       animated: true,
       viewPosition: 0.1,
     });
-  }, [lastVisibleIndex, rants.length, unreadCount]);
+  }, [highestSeenIndex, rants.length, unreadCount]);
 
   const handleReportSubmit = async (reason: string, details: string) => {
     if (!session?.user?.id) {

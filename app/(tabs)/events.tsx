@@ -225,7 +225,7 @@ export default function EventTabScreen() {
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [feeFilter, setFeeFilter] = useState<"All" | "Free" | "Paid">("All");
-  const [lastVisibleIndex, setLastVisibleIndex] = useState(-1);
+  const [highestSeenIndex, setHighestSeenIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<EventItem>>(null);
   const eventsLengthRef = useRef(0);
@@ -301,11 +301,11 @@ export default function EventTabScreen() {
   useEffect(() => {
     eventsLengthRef.current = visibleEvents.length;
     const nextUnread =
-      lastVisibleIndex >= 0
-        ? Math.max(visibleEvents.length - lastVisibleIndex - 1, 0)
+      highestSeenIndex >= 0
+        ? Math.max(visibleEvents.length - highestSeenIndex - 1, 0)
         : 0;
     setUnreadCount(nextUnread);
-  }, [lastVisibleIndex, visibleEvents.length]);
+  }, [highestSeenIndex, visibleEvents.length]);
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 60,
@@ -319,11 +319,19 @@ export default function EventTabScreen() {
 
       if (indexes.length === 0) return;
 
-      const nextLastVisibleIndex = Math.max(...indexes);
-      setLastVisibleIndex(nextLastVisibleIndex);
-      setUnreadCount(
-        Math.max(eventsLengthRef.current - nextLastVisibleIndex - 1, 0),
-      );
+      const nextVisibleMaxIndex = Math.max(...indexes);
+      setHighestSeenIndex((previousHighestSeenIndex) => {
+        const nextHighestSeenIndex = Math.max(
+          previousHighestSeenIndex,
+          nextVisibleMaxIndex,
+        );
+        const nextUnread = Math.max(
+          eventsLengthRef.current - nextHighestSeenIndex - 1,
+          0,
+        );
+        setUnreadCount(nextUnread);
+        return nextHighestSeenIndex;
+      });
     },
   );
 
@@ -331,7 +339,7 @@ export default function EventTabScreen() {
     if (!flatListRef.current || unreadCount <= 0) return;
 
     const targetIndex = Math.min(
-      lastVisibleIndex + 1,
+      highestSeenIndex + 1,
       visibleEvents.length - 1,
     );
     if (targetIndex < 0) return;
@@ -341,7 +349,7 @@ export default function EventTabScreen() {
       animated: true,
       viewPosition: 0.1,
     });
-  }, [lastVisibleIndex, unreadCount, visibleEvents.length]);
+  }, [highestSeenIndex, unreadCount, visibleEvents.length]);
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
