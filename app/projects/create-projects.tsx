@@ -1,5 +1,8 @@
 import {
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Switch,
   TextInput,
@@ -15,7 +18,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { useTopToast } from "../../hooks/useTopToast";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Pressable } from "react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
@@ -32,7 +35,24 @@ export default function CreateProjectsScreen() {
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { toast, showToast } = useTopToast();
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const showSub = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handlePickCover = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -131,197 +151,216 @@ export default function CreateProjectsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-      <View className="flex-1 bg-white dark:bg-slate-950">
-        <TopToast
-          visible={toast.visible}
-          message={toast.message}
-          variant={toast.variant}
-        />
-        <StatusBar style={statusBarStyle} translucent={false} />
-        <View className="flex-row items-center justify-between px-5 pb-3 pt-6">
-          <TouchableOpacity
-            className="h-10 w-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20"
-            accessibilityRole="button"
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={20} color={colors.accent} />
-          </TouchableOpacity>
-          <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            Submit Project
-          </AppText>
-          <View className="h-10 w-10" />
-        </View>
-
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="px-5 pb-28"
-          showsVerticalScrollIndicator={false}
-        >
-          <View className="mt-2 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-500/30 dark:bg-emerald-900/30">
-            <View className="flex-row items-start gap-3">
-              <View className="h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-500/20">
-                <Ionicons name="bulb" size={18} color={colors.accent} />
-              </View>
-              <View className="flex-1">
-                <AppText className="text-base font-semibold text-emerald-700 dark:text-emerald-200">
-                  Share your work
-                </AppText>
-                <AppText className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  Showcase what you have built to fellow students. Great
-                  projects get featured in the weekly Hawassa digest.
-                </AppText>
-              </View>
-            </View>
-          </View>
-
-          <View className="mt-8">
-            <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Project Title
-            </AppText>
-            <View className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-              <TextInput
-                placeholder="e.g., Campus Bus Tracker"
-                placeholderTextColor={colors.mutedStrong}
-                className="text-sm text-slate-900 dark:text-slate-100"
-                value={title}
-                onChangeText={setTitle}
-              />
-            </View>
-          </View>
-
-          <View className="mt-6">
-            <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              What's it about?
-            </AppText>
-            <View className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-              <TextInput
-                placeholder="Describe the problem you solved and how it helps students..."
-                placeholderTextColor={colors.mutedStrong}
-                className="min-h-[120px] text-sm text-slate-900 dark:text-slate-100"
-                multiline
-                textAlignVertical="top"
-                maxLength={300}
-                value={summary}
-                onChangeText={setSummary}
-              />
-            </View>
-            <View className="mt-2 items-end">
-              <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                {summary.length}/300
-              </AppText>
-            </View>
-          </View>
-
-          <View className="mt-6">
-            <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Tech Stack / Skills
-            </AppText>
-            <View className="mt-3 flex-row flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
-              <View className="flex-1">
-                <TextInput
-                  placeholder="Add tags..."
-                  placeholderTextColor={colors.mutedStrong}
-                  className="text-sm text-slate-900 dark:text-slate-100"
-                  value={tagsText}
-                  onChangeText={setTagsText}
-                />
-              </View>
-            </View>
-            <AppText className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-              Press enter or comma to add a tag.
-            </AppText>
-          </View>
-
-          <View className="mt-6">
-            <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Link (GitHub, Demo, etc.)
-            </AppText>
-            <View className="mt-3 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
-              <Ionicons name="link" size={18} color={colors.mutedText} />
-              <TextInput
-                placeholder="https://"
-                placeholderTextColor={colors.mutedStrong}
-                className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-                value={repoUrl}
-                onChangeText={setRepoUrl}
-              />
-            </View>
-          </View>
-
-          <View className="mt-6 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <View className="flex-row items-center">
-              <Ionicons
-                name={isAnonymous ? "lock-closed" : "person-circle"}
-                size={18}
-                color={isAnonymous ? "#16A34A" : colors.mutedText}
-              />
-              <View className="ml-2">
-                <AppText className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  Publish anonymously
-                </AppText>
-                <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                  {isAnonymous
-                    ? "Your name and photo are hidden."
-                    : "Your name and photo will be shown."}
-                </AppText>
-              </View>
-            </View>
-            <Switch
-              value={isAnonymous}
-              onValueChange={setIsAnonymous}
-              trackColor={{ false: "#CBD5F5", true: "#16A34A" }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-
-          <View className="mt-6">
-            <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Cover Image (Optional)
-            </AppText>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
+        enabled={Platform.OS === "ios"}
+      >
+        <View className="flex-1 bg-white dark:bg-slate-950">
+          <TopToast
+            visible={toast.visible}
+            message={toast.message}
+            variant={toast.variant}
+          />
+          <StatusBar style={statusBarStyle} translucent={false} />
+          <View className="flex-row items-center justify-between px-5 pb-3 pt-6">
             <TouchableOpacity
-              className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 dark:border-slate-700 dark:bg-slate-900"
+              className="h-10 w-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20"
               accessibilityRole="button"
-              onPress={handlePickCover}
+              onPress={() => router.back()}
             >
-              {coverImageUri || coverImageUrl ? (
-                <Image
-                  source={{ uri: coverImageUri ?? coverImageUrl ?? undefined }}
-                  className="h-40 w-full rounded-xl"
-                  resizeMode="cover"
-                />
-              ) : (
-                <View className="items-center">
-                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-slate-200 dark:bg-slate-800">
-                    <Ionicons
-                      name="image-outline"
-                      size={20}
-                      color={colors.mutedText}
-                    />
-                  </View>
-                  <AppText className="mt-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    {isUploadingCover ? "Uploading..." : "Upload cover image"}
+              <Ionicons name="arrow-back" size={20} color={colors.accent} />
+            </TouchableOpacity>
+            <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              Submit Project
+            </AppText>
+            <View className="h-10 w-10" />
+          </View>
+
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName="px-5"
+            contentContainerStyle={{
+              paddingBottom:
+                Platform.OS === "android" ? keyboardHeight + 140 : 140,
+            }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View className="mt-2 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-500/30 dark:bg-emerald-900/30">
+              <View className="flex-row items-start gap-3">
+                <View className="h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-500/20">
+                  <Ionicons name="bulb" size={18} color={colors.accent} />
+                </View>
+                <View className="flex-1">
+                  <AppText className="text-base font-semibold text-emerald-700 dark:text-emerald-200">
+                    Share your work
+                  </AppText>
+                  <AppText className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    Showcase what you have built to fellow students. Great
+                    projects get featured in the weekly Hawassa digest.
                   </AppText>
                 </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+              </View>
+            </View>
 
-        <View className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
-          <Pressable
-            onPress={handleSubmit}
-            className={`flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 ${
-              isSubmitting ? "opacity-60" : ""
-            }`}
-            disabled={isSubmitting}
+            <View className="mt-8">
+              <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Project Title
+              </AppText>
+              <View className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                <TextInput
+                  placeholder="e.g., Campus Bus Tracker"
+                  placeholderTextColor={colors.mutedStrong}
+                  className="text-sm text-slate-900 dark:text-slate-100"
+                  value={title}
+                  onChangeText={setTitle}
+                />
+              </View>
+            </View>
+
+            <View className="mt-6">
+              <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                What's it about?
+              </AppText>
+              <View className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                <TextInput
+                  placeholder="Describe the problem you solved and how it helps students..."
+                  placeholderTextColor={colors.mutedStrong}
+                  className="min-h-[120px] text-sm text-slate-900 dark:text-slate-100"
+                  multiline
+                  textAlignVertical="top"
+                  maxLength={300}
+                  value={summary}
+                  onChangeText={setSummary}
+                />
+              </View>
+              <View className="mt-2 items-end">
+                <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                  {summary.length}/300
+                </AppText>
+              </View>
+            </View>
+
+            <View className="mt-6">
+              <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Tech Stack / Skills
+              </AppText>
+              <View className="mt-3 flex-row flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
+                <View className="flex-1">
+                  <TextInput
+                    placeholder="Add tags..."
+                    placeholderTextColor={colors.mutedStrong}
+                    className="text-sm text-slate-900 dark:text-slate-100"
+                    value={tagsText}
+                    onChangeText={setTagsText}
+                  />
+                </View>
+              </View>
+              <AppText className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+                Press enter or comma to add a tag.
+              </AppText>
+            </View>
+
+            <View className="mt-6">
+              <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Link (GitHub, Demo, etc.)
+              </AppText>
+              <View className="mt-3 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                <Ionicons name="link" size={18} color={colors.mutedText} />
+                <TextInput
+                  placeholder="https://"
+                  placeholderTextColor={colors.mutedStrong}
+                  className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                  value={repoUrl}
+                  onChangeText={setRepoUrl}
+                />
+              </View>
+            </View>
+
+            <View className="mt-6 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <View className="flex-row items-center">
+                <Ionicons
+                  name={isAnonymous ? "lock-closed" : "person-circle"}
+                  size={18}
+                  color={isAnonymous ? "#16A34A" : colors.mutedText}
+                />
+                <View className="ml-2">
+                  <AppText className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    Publish anonymously
+                  </AppText>
+                  <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                    {isAnonymous
+                      ? "Your name and photo are hidden."
+                      : "Your name and photo will be shown."}
+                  </AppText>
+                </View>
+              </View>
+              <Switch
+                value={isAnonymous}
+                onValueChange={setIsAnonymous}
+                trackColor={{ false: "#CBD5F5", true: "#16A34A" }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+
+            <View className="mt-6">
+              <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Cover Image (Optional)
+              </AppText>
+              <TouchableOpacity
+                className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 dark:border-slate-700 dark:bg-slate-900"
+                accessibilityRole="button"
+                onPress={handlePickCover}
+              >
+                {coverImageUri || coverImageUrl ? (
+                  <Image
+                    source={{
+                      uri: coverImageUri ?? coverImageUrl ?? undefined,
+                    }}
+                    className="h-40 w-full rounded-xl"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View className="items-center">
+                    <View className="h-12 w-12 items-center justify-center rounded-2xl bg-slate-200 dark:bg-slate-800">
+                      <Ionicons
+                        name="image-outline"
+                        size={20}
+                        color={colors.mutedText}
+                      />
+                    </View>
+                    <AppText className="mt-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {isUploadingCover ? "Uploading..." : "Upload cover image"}
+                    </AppText>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          <View
+            className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950"
+            style={{
+              marginBottom: Platform.OS === "android" ? keyboardHeight : 0,
+            }}
           >
-            <AppText className="text-sm font-semibold text-white">
-              {isSubmitting ? "Publishing..." : "Publish Project"}
-            </AppText>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-          </Pressable>
+            <Pressable
+              onPress={handleSubmit}
+              className={`flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 ${
+                isSubmitting ? "opacity-60" : ""
+              }`}
+              disabled={isSubmitting}
+            >
+              <AppText className="text-sm font-semibold text-white">
+                {isSubmitting ? "Publishing..." : "Publish Project"}
+              </AppText>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
