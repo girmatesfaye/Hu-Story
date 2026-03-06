@@ -12,6 +12,7 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type Profile = {
   full_name: string | null;
@@ -418,7 +419,10 @@ export default function ProfileTabScreen() {
   };
 
   return (
-    <View className="flex-1 bg-slate-50 dark:bg-slate-950">
+    <SafeAreaView
+      edges={["top"]}
+      className="flex-1 bg-slate-50 dark:bg-slate-950"
+    >
       <StatusBar style={statusBarStyle} translucent={false} />
       <ScrollView
         className="flex-1"
@@ -1073,6 +1077,6 @@ export default function ProfileTabScreen() {
         onClose={() => setFetchError(null)}
         onRetry={() => void handleRetryData()}
       />
-    </View>
+    </SafeAreaView>
   );
 }

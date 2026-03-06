@@ -14,6 +14,7 @@ import {
   View,
   ViewToken,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
@@ -375,12 +376,15 @@ export default function EventTabScreen() {
   }, [highestSeenIndex, unreadCount, visibleEvents.length]);
 
   return (
-    <View className="flex-1 bg-slate-50 dark:bg-slate-950">
+    <SafeAreaView
+      edges={["top"]}
+      className="flex-1 bg-slate-50 dark:bg-slate-950"
+    >
       {isLoading ? (
         <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
           <View className="flex-row items-center justify-between">
             <View>
-              <AppText className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+              <AppText className="text-[22px]  mt-1 font-semibold text-slate-900 dark:text-slate-100">
                 Upcoming Events
               </AppText>
               <AppText className="text-sm text-slate-500  dark:text-green-400">
@@ -736,6 +740,6 @@ export default function EventTabScreen() {
         onClose={() => setErrorMessage(null)}
         onRetry={() => void loadEvents()}
       />
-    </View>
+    </SafeAreaView>
   );
 }

@@ -14,6 +14,7 @@ import {
   View,
   ViewToken,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
@@ -184,12 +185,15 @@ export default function SpotsTabScreen() {
   };
 
   return (
-    <View className="flex-1 bg-slate-50 dark:bg-slate-950">
+    <SafeAreaView
+      edges={["top"]}
+      className="flex-1 bg-slate-50 dark:bg-slate-950"
+    >
       {isLoading ? (
         <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
           <View className="flex-row items-center justify-between">
             <View>
-              <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+              <AppText className="text-[22px]  font-semibold text-slate-900 dark:text-slate-100">
                 Campus Spots
               </AppText>
               <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">
@@ -453,6 +457,6 @@ export default function SpotsTabScreen() {
         onClose={() => setErrorMessage(null)}
         onRetry={() => void loadSpots()}
       />
-    </View>
+    </SafeAreaView>
   );
 }
