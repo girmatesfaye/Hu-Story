@@ -271,35 +271,110 @@ export default function AdminScreen() {
     let isMounted = true;
 
     const loadTargets = async () => {
-      const rantIds = Array.from(
-        new Set(
-          reports
-            .filter((report) => normalizeType(report.target_type) === "rants")
-            .map((report) => report.target_id),
-        ),
+      const idsByType = reports.reduce<Record<string, Set<string>>>(
+        (acc, report) => {
+          const type = normalizeType(report.target_type);
+          if (!acc[type]) {
+            acc[type] = new Set<string>();
+          }
+          acc[type].add(report.target_id);
+          return acc;
+        },
+        {},
       );
 
-      if (rantIds.length === 0) {
+      const rantIds = Array.from(idsByType.rants ?? []);
+      const eventIds = Array.from(idsByType.events ?? []);
+      const projectIds = Array.from(idsByType.projects ?? []);
+      const spotIds = Array.from(idsByType.spots ?? []);
+      const commentIds = Array.from(idsByType.comments ?? []);
+
+      if (
+        rantIds.length === 0 &&
+        eventIds.length === 0 &&
+        projectIds.length === 0 &&
+        spotIds.length === 0 &&
+        commentIds.length === 0
+      ) {
         setTargets({});
         return;
       }
 
-      const { data, error } = await supabase
-        .from("rants")
-        .select("id, content, user_id")
-        .in("id", rantIds);
+      const [
+        rantsResult,
+        eventsResult,
+        projectsResult,
+        spotsResult,
+        commentsResult,
+      ] = await Promise.all([
+        rantIds.length
+          ? supabase
+              .from("rants")
+              .select("id, content, user_id")
+              .in("id", rantIds)
+          : Promise.resolve({ data: [], error: null }),
+        eventIds.length
+          ? supabase
+              .from("events")
+              .select("id, title, description, user_id")
+              .in("id", eventIds)
+          : Promise.resolve({ data: [], error: null }),
+        projectIds.length
+          ? supabase
+              .from("projects")
+              .select("id, title, summary, user_id")
+              .in("id", projectIds)
+          : Promise.resolve({ data: [], error: null }),
+        spotIds.length
+          ? supabase
+              .from("spots")
+              .select("id, name, description, user_id")
+              .in("id", spotIds)
+          : Promise.resolve({ data: [], error: null }),
+        commentIds.length
+          ? supabase
+              .from("rant_comments")
+              .select("id, content, user_id")
+              .in("id", commentIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
       if (!isMounted) return;
 
-      if (error) {
-        setTargets({});
-        return;
-      }
-
       const map: Record<string, ReportTarget> = {};
-      (data ?? []).forEach((row) => {
+
+      (rantsResult.data ?? []).forEach((row) => {
         map[row.id] = { content: row.content, user_id: row.user_id };
       });
+
+      (eventsResult.data ?? []).forEach((row) => {
+        map[row.id] = {
+          content: row.description || row.title,
+          user_id: row.user_id,
+        };
+      });
+
+      (projectsResult.data ?? []).forEach((row) => {
+        map[row.id] = {
+          content: row.summary || row.title,
+          user_id: row.user_id,
+        };
+      });
+
+      (spotsResult.data ?? []).forEach((row) => {
+        map[row.id] = {
+          content: row.description || row.name,
+          user_id: row.user_id,
+        };
+      });
+
+      (commentsResult.data ?? []).forEach((row) => {
+        map[row.id] = {
+          content: row.content,
+          user_id: row.user_id,
+        };
+      });
+
       setTargets(map);
     };
 
