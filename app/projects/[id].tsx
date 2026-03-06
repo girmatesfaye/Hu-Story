@@ -19,6 +19,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import { formatTimeAgo } from "../../lib/ui/formatters";
 
 type ProjectDetail = {
   id: string;
@@ -43,20 +44,6 @@ type ProjectAuthor = {
 
 const fallbackCover =
   "https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?auto=format&fit=crop&w=1200&q=80";
-
-const formatTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-};
 
 export default function ProjectDetailsScreen() {
   const { statusBarStyle } = useTheme();

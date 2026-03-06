@@ -9,6 +9,7 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import { useRouter } from "expo-router";
 import { isAdminUser } from "../../constants/admin";
+import { formatTimeAgo } from "../../lib/ui/formatters";
 
 const moderationTabs = [
   { id: "pending", label: "Pending" },
@@ -29,20 +30,6 @@ type ReportRow = {
 type ReportTarget = {
   content?: string | null;
   user_id?: string | null;
-};
-
-const formatTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 };
 
 const formatUserLabel = (userId?: string | null) => {
