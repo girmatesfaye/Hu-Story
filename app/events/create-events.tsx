@@ -131,9 +131,26 @@ export default function CreateEventScreen() {
   const [isLoadingEvent, setIsLoadingEvent] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const { toast, showToast } = useTopToast();
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const showSub = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -398,7 +415,10 @@ export default function CreateEventScreen() {
             {/* <ScrollView contentContainerClassName="px-5 pb-28 pt-5"> */}
             <KeyboardAwareScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: 160 }}
+              contentContainerStyle={{
+                paddingBottom:
+                  Platform.OS === "android" ? keyboardHeight + 170 : 170,
+              }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               enableOnAndroid
@@ -778,7 +798,12 @@ export default function CreateEventScreen() {
               </View>
             </Modal>
 
-            <View className="border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
+            <View
+              className="border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950"
+              style={{
+                marginBottom: Platform.OS === "android" ? keyboardHeight : 0,
+              }}
+            >
               <Pressable
                 onPress={handleSubmit}
                 className={`flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 ${

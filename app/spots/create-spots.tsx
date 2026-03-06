@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Image,
+  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -54,7 +55,24 @@ export default function CreateSpotScreen() {
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { toast, showToast } = useTopToast();
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const showSub = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handlePickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -228,7 +246,10 @@ export default function CreateSpotScreen() {
 
         <KeyboardAwareScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 160 }}
+          contentContainerStyle={{
+            paddingBottom:
+              Platform.OS === "android" ? keyboardHeight + 170 : 170,
+          }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           enableOnAndroid
@@ -444,7 +465,12 @@ export default function CreateSpotScreen() {
           </View>
         </KeyboardAwareScrollView>
 
-        <View className="border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
+        <View
+          className="border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950"
+          style={{
+            marginBottom: Platform.OS === "android" ? keyboardHeight : 0,
+          }}
+        >
           <Pressable
             onPress={handleSubmit}
             className={`flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 ${
