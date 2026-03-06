@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { formatTimeAgo } from "../../lib/ui/formatters";
 
 const filters = ["All", "Rants", "Events", "Projects"];
 
@@ -18,20 +19,6 @@ type NotificationItem = {
   type: string | null;
   is_read: boolean;
   created_at: string;
-};
-
-const formatTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 };
 
 const getNotificationTone = (type?: string | null) => {
