@@ -379,7 +379,10 @@ export default function RantsScreen() {
         <ScrollView contentContainerClassName="px-5 pt-5 pb-20">
           <View className="flex-row items-center justify-between mb-4">
             <View>
-              <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
+              <AppText
+                className="text-[22px] font-bold text-slate-900 dark:text-slate-100"
+                style={{ fontFamily: "LexendRegular" }}
+              >
                 HU Rants
               </AppText>
               <AppText className="text-xs mt-[2px] text-slate-500  dark:text-green-400">
@@ -455,7 +458,10 @@ export default function RantsScreen() {
             <>
               <View className="flex-row items-center justify-between mb-4">
                 <View>
-                  <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
+                  <AppText
+                    className="text-[22px] font-bold text-slate-900 dark:text-slate-100"
+                    style={{ fontFamily: "LexendRegular" }}
+                  >
                     HU Rants
                   </AppText>
                   <AppText className="text-xs mt-[2px] text-slate-500  dark:text-green-400">

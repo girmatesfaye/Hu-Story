@@ -193,7 +193,7 @@ export default function SpotsTabScreen() {
         <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
           <View className="flex-row items-center justify-between">
             <View>
-              <AppText className="text-[22px]  font-semibold text-slate-900 dark:text-slate-100">
+              <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
                 Campus Spots
               </AppText>
               <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">

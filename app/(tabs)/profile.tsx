@@ -429,17 +429,17 @@ export default function ProfileTabScreen() {
         contentContainerClassName="px-5 pb-28"
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center justify-between pt-6">
-          <TouchableOpacity
-            className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900"
-            accessibilityRole="button"
-          >
-            <Ionicons
-              name="arrow-back"
-              size={20}
-              color={statusBarStyle === "light" ? "#E5E7EB" : "#0F172A"}
-            />
-          </TouchableOpacity>
+        <View className="flex-row items-center justify-between pt-4">
+          <View className="flex-row items-center justify-between">
+            <View>
+              <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
+                Profile Page
+              </AppText>
+              <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">
+                Control what you post here.
+              </AppText>
+            </View>
+          </View>
           <TouchableOpacity
             className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900"
             accessibilityRole="button"

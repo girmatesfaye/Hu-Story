@@ -311,7 +311,7 @@ export default function ProjectsTabScreen() {
         >
           <View className="flex-row items-start justify-between">
             <View className="flex-1 pr-4">
-              <AppText className="text-[22px]  font-semibold text-slate-900 dark:text-slate-100">
+              <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
                 Campus Projects
               </AppText>
               <AppText className="mt-1 text-sm text-slate-500  dark:text-green-400">

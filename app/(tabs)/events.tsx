@@ -384,7 +384,7 @@ export default function EventTabScreen() {
         <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
           <View className="flex-row items-center justify-between">
             <View>
-              <AppText className="text-[22px]  mt-1 font-semibold text-slate-900 dark:text-slate-100">
+              <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
                 Upcoming Events
               </AppText>
               <AppText className="text-sm text-slate-500  dark:text-green-400">
