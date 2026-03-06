@@ -72,6 +72,7 @@ type EventCardProps = {
   price: string;
   image: string;
   badge?: string;
+  hasPassed?: boolean;
   dateTag?: string;
   host?: string;
   attendees?: string[];
@@ -89,6 +90,7 @@ function EventCard({
   price,
   image,
   badge,
+  hasPassed,
   dateTag,
   host,
   attendees = [],
@@ -101,8 +103,16 @@ function EventCard({
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className="relative flex-row gap-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
+      {hasPassed ? (
+        <View className="absolute right-2 top-2 rounded-md bg-red-600 px-2 py-1">
+          <AppText className="text-[10px] font-semibold text-white">
+            Event Passed
+          </AppText>
+        </View>
+      ) : null}
+
       <View className="relative">
         <Image
           source={{ uri: image }}
@@ -225,6 +235,7 @@ export default function EventTabScreen() {
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [feeFilter, setFeeFilter] = useState<"All" | "Free" | "Paid">("All");
+  const [searchQuery, setSearchQuery] = useState("");
   const [highestSeenIndex, setHighestSeenIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<EventItem>>(null);
@@ -268,9 +279,21 @@ export default function EventTabScreen() {
     const today = new Date();
     const todayList: EventItem[] = [];
     const nextList: EventItem[] = [];
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
     const filteredEvents = events.filter((event) => {
-      if (feeFilter === "All") return true;
-      return (event.fee_type ?? "").toLowerCase() === feeFilter.toLowerCase();
+      const matchesFee =
+        feeFilter === "All" ||
+        (event.fee_type ?? "").toLowerCase() === feeFilter.toLowerCase();
+
+      if (!matchesFee) return false;
+      if (!normalizedSearchQuery) return true;
+
+      const searchableText = [event.title, event.location, event.host_name]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearchQuery);
     });
 
     filteredEvents.forEach((event) => {
@@ -291,7 +314,7 @@ export default function EventTabScreen() {
     });
 
     return { todayEvents: todayList, nextWeekEvents: nextList };
-  }, [events, feeFilter]);
+  }, [events, feeFilter, searchQuery]);
 
   const visibleEvents = useMemo(
     () => [...todayEvents, ...nextWeekEvents],
@@ -387,6 +410,8 @@ export default function EventTabScreen() {
                 placeholder="Search events, clubs..."
                 placeholderTextColor={colors.mutedStrong}
                 className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
               />
             </View>
             <Pressable
@@ -531,6 +556,8 @@ export default function EventTabScreen() {
                     placeholder="Search events, clubs..."
                     placeholderTextColor={colors.mutedStrong}
                     className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
                   />
                 </View>
                 <Pressable
@@ -622,38 +649,48 @@ export default function EventTabScreen() {
               <View className="h-3" />
             </>
           }
-          renderItem={({ item: event, index }) => (
-            <>
-              {index === todayEvents.length ? (
-                <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  Next Week
-                </AppText>
-              ) : null}
-              <View
-                className={index === todayEvents.length ? "mt-3" : undefined}
-              >
-                <EventCard
-                  title={event.title}
-                  time={formatEventDateRange(event.start_at, event.end_at)}
-                  location={event.location ?? "Location TBD"}
-                  price={
-                    event.fee_type?.toLowerCase() === "paid"
-                      ? event.fee_amount
-                        ? `${event.fee_amount} ETB`
-                        : "Paid"
-                      : "Free"
-                  }
-                  image={
-                    resolveEventCoverUrl(event.cover_url) ?? fallbackEventImage
-                  }
-                  badge={index < todayEvents.length ? "Today" : undefined}
-                  host={event.host_name ? `By ${event.host_name}` : undefined}
-                  iconColor={iconColor}
-                  onPress={() => router.push(`../events/${event.id}`)}
-                />
-              </View>
-            </>
-          )}
+          renderItem={({ item: event, index }) => {
+            const eventEndDate = event.end_at ? new Date(event.end_at) : null;
+            const hasPassed = eventEndDate
+              ? !Number.isNaN(eventEndDate.getTime()) &&
+                eventEndDate.getTime() < Date.now()
+              : false;
+
+            return (
+              <>
+                {index === todayEvents.length ? (
+                  <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Next Week
+                  </AppText>
+                ) : null}
+                <View
+                  className={index === todayEvents.length ? "mt-3" : undefined}
+                >
+                  <EventCard
+                    title={event.title}
+                    time={formatEventDateRange(event.start_at, event.end_at)}
+                    location={event.location ?? "Location TBD"}
+                    price={
+                      event.fee_type?.toLowerCase() === "paid"
+                        ? event.fee_amount
+                          ? `${event.fee_amount} ETB`
+                          : "Paid"
+                        : "Free"
+                    }
+                    image={
+                      resolveEventCoverUrl(event.cover_url) ??
+                      fallbackEventImage
+                    }
+                    badge={index < todayEvents.length ? "Today" : undefined}
+                    hasPassed={hasPassed}
+                    host={event.host_name ? `By ${event.host_name}` : undefined}
+                    iconColor={iconColor}
+                    onPress={() => router.push(`../events/${event.id}`)}
+                  />
+                </View>
+              </>
+            );
+          }}
           ItemSeparatorComponent={() => <View className="h-4" />}
           ListFooterComponent={
             <>

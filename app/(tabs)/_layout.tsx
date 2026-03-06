@@ -8,11 +8,14 @@ import { useTheme } from "../../hooks/useTheme";
 import { StatusBar } from "expo-status-bar";
 
 export default function TabLayout() {
-  const { colors } = useTheme();
+  const { colors, statusBarStyle } = useTheme();
 
   return (
     <>
-      <StatusBar backgroundColor={colors.headerBackground} />
+      <StatusBar
+        style={statusBarStyle}
+        backgroundColor={colors.headerBackground}
+      />
       <Tabs
         screenOptions={{
           headerShown: false,
