@@ -402,6 +402,8 @@ create table if not exists public.events (
   fee_type text,
   fee_amount numeric,
   attendees_count int not null default 0,
+  likes int not null default 0,
+  views int not null default 0,
   host_name text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -475,6 +477,118 @@ begin
   end if;
 
   return coalesce(v_count, 0);
+end;
+$$;
+
+-- Event likes
+create table if not exists public.event_likes (
+  event_id uuid not null references public.events(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (event_id, user_id)
+);
+
+create index if not exists event_likes_event_id_idx on public.event_likes(event_id);
+create index if not exists event_likes_user_id_idx on public.event_likes(user_id);
+
+create or replace function public.set_event_like(p_event_id uuid, p_is_liked boolean)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_exists boolean;
+  v_likes int;
+begin
+  if auth.uid() is null then
+    raise exception 'unauthenticated';
+  end if;
+
+  select exists (
+    select 1
+    from public.event_likes
+    where event_id = p_event_id
+      and user_id = auth.uid()
+  ) into v_exists;
+
+  if p_is_liked and not v_exists then
+    insert into public.event_likes (event_id, user_id)
+    values (p_event_id, auth.uid());
+
+    update public.events
+    set likes = likes + 1
+    where id = p_event_id
+    returning likes into v_likes;
+  elsif (not p_is_liked) and v_exists then
+    delete from public.event_likes
+    where event_id = p_event_id
+      and user_id = auth.uid();
+
+    update public.events
+    set likes = greatest(likes - 1, 0)
+    where id = p_event_id
+    returning likes into v_likes;
+  else
+    select likes into v_likes
+    from public.events
+    where id = p_event_id;
+  end if;
+
+  return coalesce(v_likes, 0);
+end;
+$$;
+
+-- Event views (one per user)
+create table if not exists public.event_views (
+  event_id uuid not null references public.events(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (event_id, user_id)
+);
+
+create index if not exists event_views_event_id_idx on public.event_views(event_id);
+create index if not exists event_views_user_id_idx on public.event_views(user_id);
+
+create or replace function public.increment_event_views(p_event_id uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_exists boolean;
+  v_views int;
+begin
+  if auth.uid() is null then
+    select views into v_views
+    from public.events
+    where id = p_event_id;
+    return coalesce(v_views, 0);
+  end if;
+
+  select exists (
+    select 1
+    from public.event_views
+    where event_id = p_event_id
+      and user_id = auth.uid()
+  ) into v_exists;
+
+  if not v_exists then
+    insert into public.event_views (event_id, user_id)
+    values (p_event_id, auth.uid());
+
+    update public.events e
+    set views = e.views + 1
+    where e.id = p_event_id
+    returning e.views into v_views;
+  else
+    select views into v_views
+    from public.events
+    where id = p_event_id;
+  end if;
+
+  return coalesce(v_views, 0);
 end;
 $$;
 

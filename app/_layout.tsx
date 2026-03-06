@@ -13,7 +13,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const { statusBarStyle } = useTheme();
+  const { colors, statusBarStyle } = useTheme();
   const [fontsLoaded] = useFonts({
     LexendRegular: require("../assets/fonts/Lexend-Regular.ttf"),
   });
@@ -85,7 +85,11 @@ export default function RootLayout() {
             options={{ headerShown: false }}
           />
         </Stack>
-        <StatusBar style={statusBarStyle} />
+        <StatusBar
+          style={statusBarStyle}
+          backgroundColor={colors.headerBackground}
+          translucent={false}
+        />
       </View>
     </SupabaseProvider>
   );

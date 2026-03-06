@@ -22,6 +22,7 @@ type EventDetail = {
   cover_url: string | null;
   tags: string[] | null;
   attendees_count: number;
+  likes: number;
   host_name: string | null;
 };
 
@@ -47,7 +48,9 @@ export default function EventDetailsScreen() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isGoing, setIsGoing] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLikeUpdating, setIsLikeUpdating] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   const loadEvent = useCallback(async () => {
@@ -60,7 +63,7 @@ export default function EventDetailsScreen() {
     const { data, error } = await supabase
       .from("events")
       .select(
-        "id, title, description, start_at, end_at, location, address, cover_url, tags, attendees_count, host_name",
+        "id, title, description, start_at, end_at, location, address, cover_url, tags, attendees_count, likes, host_name",
       )
       .eq("id", id)
       .maybeSingle();
@@ -75,7 +78,7 @@ export default function EventDetailsScreen() {
     setIsLoading(false);
   }, [id]);
 
-  const loadGoingStatus = useCallback(async () => {
+  const loadInteractionStatus = useCallback(async () => {
     if (!id) return;
 
     const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -90,6 +93,7 @@ export default function EventDetailsScreen() {
 
     if (!currentUserId) {
       setIsGoing(false);
+      setIsLiked(false);
       return;
     }
 
@@ -105,12 +109,25 @@ export default function EventDetailsScreen() {
     } else {
       setIsGoing(false);
     }
+
+    const { data: existingLike, error: likeError } = await supabase
+      .from("event_likes")
+      .select("event_id")
+      .eq("event_id", id)
+      .eq("user_id", currentUserId)
+      .maybeSingle();
+
+    if (!likeError && existingLike) {
+      setIsLiked(true);
+    } else {
+      setIsLiked(false);
+    }
   }, [id]);
 
   useEffect(() => {
     void loadEvent();
-    void loadGoingStatus();
-  }, [loadEvent, loadGoingStatus]);
+    void loadInteractionStatus();
+  }, [loadEvent, loadInteractionStatus]);
 
   const handleGoing = async () => {
     if (!event || isUpdating || isGoing) return;
@@ -176,6 +193,51 @@ export default function EventDetailsScreen() {
     }
 
     setIsUpdating(false);
+  };
+
+  const handleToggleLike = async () => {
+    if (!event || isLikeUpdating) return;
+
+    if (!userId) {
+      setErrorMessage("Sign in to like events.");
+      return;
+    }
+
+    setIsLikeUpdating(true);
+    setErrorMessage(null);
+
+    const previousLiked = isLiked;
+    const previousLikes = event.likes ?? 0;
+    const nextLiked = !isLiked;
+
+    setIsLiked(nextLiked);
+    setEvent((prev) =>
+      prev
+        ? {
+            ...prev,
+            likes: Math.max((prev.likes ?? 0) + (nextLiked ? 1 : -1), 0),
+          }
+        : prev,
+    );
+
+    const { data, error } = await supabase.rpc("set_event_like", {
+      p_event_id: event.id,
+      p_is_liked: nextLiked,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setIsLiked(previousLiked);
+      setEvent((prev) => (prev ? { ...prev, likes: previousLikes } : prev));
+      setIsLikeUpdating(false);
+      return;
+    }
+
+    if (typeof data === "number") {
+      setEvent((prev) => (prev ? { ...prev, likes: data } : prev));
+    }
+
+    setIsLikeUpdating(false);
   };
 
   const dateBadge = useMemo(() => {
@@ -325,9 +387,12 @@ export default function EventDetailsScreen() {
                   <View className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
 
                   <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center">
+                    <View className="flex-row items-center gap-3">
                       <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                        {event?.attendees_count ?? 0}
+                        {event?.attendees_count ?? 0} going
+                      </AppText>
+                      <AppText className="text-xs text-slate-500 dark:text-slate-400">
+                        {event?.likes ?? 0} likes
                       </AppText>
                     </View>
                     <AppText className="text-xs text-slate-500 dark:text-slate-400">
@@ -386,9 +451,19 @@ export default function EventDetailsScreen() {
               {isGoing ? "Cancel Going" : "I'm Going"}
             </AppText>
           </Pressable>
-          {/* <Pressable className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-            <Ionicons name="bookmark-outline" size={18} color={colors.text} />
-          </Pressable> */}
+          <Pressable
+            onPress={handleToggleLike}
+            disabled={isLikeUpdating}
+            className={`h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 ${
+              isLikeUpdating ? "opacity-60" : ""
+            }`}
+          >
+            <Ionicons
+              name={isLiked ? "heart" : "heart-outline"}
+              size={18}
+              color={isLiked ? "#DC2626" : colors.text}
+            />
+          </Pressable>
         </View>
 
         <FetchErrorModal
@@ -397,7 +472,7 @@ export default function EventDetailsScreen() {
           onClose={() => setFetchError(null)}
           onRetry={() => {
             void loadEvent();
-            void loadGoingStatus();
+            void loadInteractionStatus();
           }}
         />
       </View>

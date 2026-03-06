@@ -168,7 +168,7 @@ export default function EditProfileScreen() {
           message={toast.message}
           variant={toast.variant}
         />
-        <StatusBar style={statusBarStyle} />
+        <StatusBar style={statusBarStyle} translucent={false} />
         <View className="flex-row items-center justify-between px-5 pb-3 pt-6">
           <TouchableOpacity
             accessibilityRole="button"

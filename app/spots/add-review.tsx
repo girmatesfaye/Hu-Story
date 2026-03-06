@@ -66,7 +66,7 @@ export default function AddReviewScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1 bg-white dark:bg-slate-950">
-        <StatusBar style={statusBarStyle} />
+        <StatusBar style={statusBarStyle} translucent={false} />
         <View className="flex-row items-center justify-between px-5 pb-3 pt-6">
           <Pressable
             onPress={() => router.back()}
