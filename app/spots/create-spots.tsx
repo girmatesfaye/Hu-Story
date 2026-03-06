@@ -21,18 +21,7 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-const categories = [
-  "All",
-  "Food",
-  "Hangout",
-  "Game",
-  "Study",
-  "Date Spots",
-  "Quiet Areas",
-  "Outdoor",
-  "Cheap Eats",
-  "Other",
-];
+import { SPOT_CATEGORIES } from "../../constants/categories";
 
 export default function CreateSpotScreen() {
   const router = useRouter();
@@ -48,7 +37,9 @@ export default function CreateSpotScreen() {
   const [feeType, setFeeType] = useState<"free" | "paid">("free");
   const [priceAmount, setPriceAmount] = useState("");
   const [name, setName] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(categories[0]);
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    SPOT_CATEGORIES[0],
+  );
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [descriptionHeight, setDescriptionHeight] = useState(140);
@@ -318,7 +309,7 @@ export default function CreateSpotScreen() {
             </AppText>
 
             <View className="mt-3 flex-row flex-wrap gap-2">
-              {categories.map((option) => (
+              {SPOT_CATEGORIES.map((option) => (
                 <Pressable
                   key={option}
                   onPress={() => setSelectedCategory(option)}

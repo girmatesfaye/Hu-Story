@@ -435,7 +435,7 @@ export default function ProfileTabScreen() {
               <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
                 Profile Page
               </AppText>
-              <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">
+              <AppText className="mt-1 text-sm font-semibold text-slate-500 tracking-wider dark:text-green-400">
                 Control what you post here.
               </AppText>
             </View>

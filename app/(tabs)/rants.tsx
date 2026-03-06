@@ -18,19 +18,7 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
-
-const chips = [
-  "All Rants",
-  "Campus Life",
-  "Cafeteria",
-  "Academics",
-  "Dorms",
-  "Relationships",
-  "Sexual",
-  "Mental",
-  "Family",
-  "Other",
-];
+import { RANT_FILTER_CHIPS } from "../../constants/categories";
 
 type RantItem = {
   id: string;
@@ -95,18 +83,24 @@ function RantCardSkeleton() {
 }
 
 export default function RantsScreen() {
+  const PAGE_SIZE = 15;
   const router = useRouter();
   const { session } = useSupabase();
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-  const [activeChip, setActiveChip] = useState(chips[0]);
+  const [activeChip, setActiveChip] = useState<string>(RANT_FILTER_CHIPS[0]);
   const [rants, setRants] = useState<RantItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [highestSeenIndex, setHighestSeenIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<RantItem>>(null);
   const rantsLengthRef = useRef(0);
+  const nextPageRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const isFetchingRef = useRef(false);
   const scheme = useColorScheme();
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
@@ -116,104 +110,121 @@ export default function RantsScreen() {
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
 
-  const loadRants = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  const loadRants = useCallback(
+    async (reset = false) => {
+      if (isFetchingRef.current) return;
+      if (!reset && !hasMoreRef.current) return;
 
-    let query = supabase
-      .from("rants")
-      .select(
-        "id, user_id, category, content, upvotes, downvotes, comment_count, views, created_at, is_anonymous",
-      )
-      .order("created_at", { ascending: false });
+      isFetchingRef.current = true;
+      if (reset) {
+        nextPageRef.current = 0;
+        hasMoreRef.current = true;
+        setHasMore(true);
+        setIsLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
+      setErrorMessage(null);
 
-    if (activeChip !== "All Rants") {
-      query = query.eq("category", activeChip);
-    }
+      const from = nextPageRef.current * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
 
-    const { data, error } = await query;
+      let query = supabase
+        .from("rants")
+        .select(
+          "id, user_id, category, content, upvotes, downvotes, comment_count, views, created_at, is_anonymous",
+        )
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
-    if (error) {
-      setErrorMessage(error.message);
-      setRants([]);
-    } else {
-      const rows = (data ?? []) as RantItem[];
-      const rantIds = rows.map((rant) => rant.id);
-      const userIds = Array.from(
-        new Set(
-          rows
-            .filter((rant) => !rant.is_anonymous && rant.user_id)
-            .map((rant) => rant.user_id as string),
-        ),
-      );
+      if (activeChip !== "All Rants") {
+        query = query.eq("category", activeChip);
+      }
 
-      let profileMap = new Map<string, RantItem["profile"]>();
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("user_id, full_name, username, avatar_url")
-          .in("user_id", userIds);
+      const { data, error } = await query;
 
-        profileMap = new Map(
-          (profiles ?? []).map((profile) => [profile.user_id, profile]),
+      if (error) {
+        setErrorMessage(error.message);
+        if (reset) {
+          setRants([]);
+        }
+      } else {
+        const rows = (data ?? []) as RantItem[];
+        const rantIds = rows.map((rant) => rant.id);
+        const userIds = Array.from(
+          new Set(
+            rows
+              .filter((rant) => !rant.is_anonymous && rant.user_id)
+              .map((rant) => rant.user_id as string),
+          ),
         );
-      }
 
-      let voteMap = new Map<string, number>();
-      if (session?.user?.id && rantIds.length > 0) {
-        const { data: votes } = await supabase
-          .from("rant_votes")
-          .select("rant_id, vote")
-          .in("rant_id", rantIds)
-          .eq("user_id", session.user.id);
+        let profileMap = new Map<string, RantItem["profile"]>();
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, full_name, username, avatar_url")
+            .in("user_id", userIds);
 
-        voteMap = new Map(
-          (votes ?? []).map((vote) => [vote.rant_id, vote.vote]),
-        );
-      }
+          profileMap = new Map(
+            (profiles ?? []).map((profile) => [profile.user_id, profile]),
+          );
+        }
 
-      let commentCountMap = new Map<string, number>();
-      if (rantIds.length > 0) {
-        const { data: commentRows } = await supabase
-          .from("rant_comments")
-          .select("rant_id")
-          .in("rant_id", rantIds);
+        let voteMap = new Map<string, number>();
+        if (session?.user?.id && rantIds.length > 0) {
+          const { data: votes } = await supabase
+            .from("rant_votes")
+            .select("rant_id, vote")
+            .in("rant_id", rantIds)
+            .eq("user_id", session.user.id);
 
-        commentCountMap = new Map();
-        (commentRows ?? []).forEach((row) => {
-          const key = row.rant_id as string;
-          commentCountMap.set(key, (commentCountMap.get(key) ?? 0) + 1);
-        });
-      }
+          voteMap = new Map(
+            (votes ?? []).map((vote) => [vote.rant_id, vote.vote]),
+          );
+        }
 
-      setRants(
-        rows.map((rant) => ({
+        const hydratedRows = rows.map((rant) => ({
           ...rant,
-          comment_count: commentCountMap.get(rant.id) ?? 0,
           profile: rant.user_id ? profileMap.get(rant.user_id) : undefined,
           user_vote: voteMap.get(rant.id) ?? 0,
-        })),
-      );
-    }
+        }));
 
-    setIsLoading(false);
-  }, [activeChip, session?.user?.id]);
+        setRants((prev) => {
+          if (reset) return hydratedRows;
+
+          const existingIds = new Set(prev.map((item) => item.id));
+          const nextRows = hydratedRows.filter(
+            (item) => !existingIds.has(item.id),
+          );
+          return [...prev, ...nextRows];
+        });
+
+        if (rows.length > 0) {
+          nextPageRef.current += 1;
+        }
+        const nextHasMore = rows.length === PAGE_SIZE;
+        hasMoreRef.current = nextHasMore;
+        setHasMore(nextHasMore);
+      }
+
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
+      isFetchingRef.current = false;
+    },
+    [activeChip, session?.user?.id],
+  );
 
   useEffect(() => {
-    let isMounted = true;
-    const load = async () => {
-      if (!isMounted) return;
-      await loadRants();
-    };
-    load();
-    return () => {
-      isMounted = false;
-    };
+    void loadRants(true);
   }, [loadRants]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadRants();
+      void loadRants(true);
       return undefined;
     }, [loadRants]),
   );
@@ -407,17 +418,18 @@ export default function RantsScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerClassName="gap-2 pb-1"
           >
-            {chips.map((chip) => {
+            {RANT_FILTER_CHIPS.map((chip) => {
               const active = chip === activeChip;
               return (
-                <View
+                <Pressable
                   key={chip}
                   className={`px-4 py-2 rounded-full border ${
                     active
                       ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
                       : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
                   }`}
-                  onTouchEnd={() => setActiveChip(chip)}
+                  accessibilityRole="button"
+                  onPress={() => setActiveChip(chip)}
                 >
                   <AppText
                     className={`text-xs ${
@@ -428,7 +440,7 @@ export default function RantsScreen() {
                   >
                     {chip}
                   </AppText>
-                </View>
+                </Pressable>
               );
             })}
           </ScrollView>
@@ -445,6 +457,12 @@ export default function RantsScreen() {
           data={rants}
           keyExtractor={(item) => item.id}
           contentContainerClassName="px-5 pt-5 pb-20"
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (!isLoadingMore && hasMore) {
+              void loadRants(false);
+            }
+          }}
           viewabilityConfig={viewabilityConfig.current}
           onViewableItemsChanged={onViewableItemsChanged.current}
           onScrollToIndexFailed={({ index, averageItemLength }) => {
@@ -486,17 +504,18 @@ export default function RantsScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerClassName="gap-2 pb-1"
               >
-                {chips.map((chip) => {
+                {RANT_FILTER_CHIPS.map((chip) => {
                   const active = chip === activeChip;
                   return (
-                    <View
+                    <Pressable
                       key={chip}
                       className={`px-4 py-2 rounded-full border ${
                         active
                           ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
                           : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
                       }`}
-                      onTouchEnd={() => setActiveChip(chip)}
+                      accessibilityRole="button"
+                      onPress={() => setActiveChip(chip)}
                     >
                       <AppText
                         className={`text-xs ${
@@ -507,7 +526,7 @@ export default function RantsScreen() {
                       >
                         {chip}
                       </AppText>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </ScrollView>
@@ -640,9 +659,15 @@ export default function RantsScreen() {
           )}
           ItemSeparatorComponent={() => <View className="h-4" />}
           ListFooterComponent={
-            <AppText className="text-xs text-center mt-4 text-slate-400 dark:text-slate-500">
-              You are all caught up!
-            </AppText>
+            isLoadingMore ? (
+              <AppText className="text-xs text-center mt-4 text-slate-400 dark:text-slate-500">
+                Loading more...
+              </AppText>
+            ) : !hasMore && rants.length > 0 ? (
+              <AppText className="text-xs text-center mt-4 text-slate-400 dark:text-slate-500">
+                You are all caught up!
+              </AppText>
+            ) : null
           }
         />
       )}
@@ -673,7 +698,7 @@ export default function RantsScreen() {
         visible={Boolean(errorMessage)}
         message={errorMessage}
         onClose={() => setErrorMessage(null)}
-        onRetry={() => void loadRants()}
+        onRetry={() => void loadRants(true)}
       />
     </SafeAreaView>
   );

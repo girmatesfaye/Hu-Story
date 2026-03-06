@@ -226,14 +226,18 @@ function EventCardSkeleton() {
 }
 
 export default function EventTabScreen() {
+  const PAGE_SIZE = 15;
   const router = useRouter();
   const { colors } = useTheme();
   const iconColor = colors.mutedStrong;
   const scheme = useColorScheme();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
+  const [showPastEvents, setShowPastEvents] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [feeFilter, setFeeFilter] = useState<"All" | "Free" | "Paid">("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -241,6 +245,9 @@ export default function EventTabScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<EventItem>>(null);
   const eventsLengthRef = useRef(0);
+  const nextPageRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const isFetchingRef = useRef(false);
 
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
@@ -249,77 +256,164 @@ export default function EventTabScreen() {
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
 
-  const loadEvents = useCallback(async () => {
-    setIsLoading(true);
+  const loadEvents = useCallback(async (reset = false) => {
+    if (isFetchingRef.current) return;
+    if (!reset && !hasMoreRef.current) return;
+
+    isFetchingRef.current = true;
+    if (reset) {
+      nextPageRef.current = 0;
+      hasMoreRef.current = true;
+      setHasMore(true);
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
     setErrorMessage(null);
+
+    const from = nextPageRef.current * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
     const { data, error } = await supabase
       .from("events")
       .select(
         "id, title, start_at, end_at, location, cover_url, fee_type, fee_amount, host_name",
       )
-      .order("start_at", { ascending: true });
+      .order("start_at", { ascending: true })
+      .range(from, to);
 
     if (error) {
       setErrorMessage(error.message);
-      setEvents([]);
+      if (reset) {
+        setEvents([]);
+      }
     } else {
-      setEvents((data ?? []) as EventItem[]);
+      const rows = (data ?? []) as EventItem[];
+      setEvents((prev) => {
+        if (reset) return rows;
+
+        const existingIds = new Set(prev.map((item) => item.id));
+        const nextRows = rows.filter((item) => !existingIds.has(item.id));
+        return [...prev, ...nextRows];
+      });
+
+      if (rows.length > 0) {
+        nextPageRef.current += 1;
+      }
+      const nextHasMore = rows.length === PAGE_SIZE;
+      hasMoreRef.current = nextHasMore;
+      setHasMore(nextHasMore);
     }
 
-    setIsLoading(false);
+    if (reset) {
+      setIsLoading(false);
+    } else {
+      setIsLoadingMore(false);
+    }
+    isFetchingRef.current = false;
   }, []);
 
   useEffect(() => {
-    void loadEvents();
+    void loadEvents(true);
   }, [loadEvents]);
 
   const dateChips = useMemo(() => buildDateChips(6), []);
+  const selectedDate = useMemo(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + selectedDateIndex);
+    return date;
+  }, [selectedDateIndex]);
 
-  const { todayEvents, nextWeekEvents } = useMemo(() => {
-    const today = new Date();
-    const todayList: EventItem[] = [];
-    const nextList: EventItem[] = [];
+  const selectedChip = dateChips[selectedDateIndex] ?? dateChips[0];
+
+  const hasEventPassed = useCallback((event: EventItem) => {
+    const reference = event.end_at ?? event.start_at;
+    if (!reference) return false;
+
+    const referenceDate = new Date(reference);
+    if (Number.isNaN(referenceDate.getTime())) return false;
+
+    return referenceDate.getTime() < Date.now();
+  }, []);
+
+  const { todayEvents, upcomingWeekEvents, laterEvents, pastEvents } =
+    useMemo(() => {
+      const todayList: EventItem[] = [];
+      const upcomingWeekList: EventItem[] = [];
+      const laterList: EventItem[] = [];
+      const pastList: EventItem[] = [];
+      const msInDay = 24 * 60 * 60 * 1000;
+      const startOfSelectedDay = new Date(selectedDate);
+      startOfSelectedDay.setHours(0, 0, 0, 0);
     const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-    const filteredEvents = events.filter((event) => {
-      const matchesFee =
-        feeFilter === "All" ||
-        (event.fee_type ?? "").toLowerCase() === feeFilter.toLowerCase();
 
-      if (!matchesFee) return false;
-      if (!normalizedSearchQuery) return true;
+      const filteredEvents = events.filter((event) => {
+        const matchesFee =
+          feeFilter === "All" ||
+          (event.fee_type ?? "").toLowerCase() === feeFilter.toLowerCase();
 
-      const searchableText = [event.title, event.location, event.host_name]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+        if (!matchesFee) return false;
+        if (!normalizedSearchQuery) return true;
 
-      return searchableText.includes(normalizedSearchQuery);
-    });
+        const searchableText = [event.title, event.location, event.host_name]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
 
-    filteredEvents.forEach((event) => {
-      if (!event.start_at) {
-        nextList.push(event);
-        return;
-      }
-      const eventDate = new Date(event.start_at);
-      if (Number.isNaN(eventDate.getTime())) {
-        nextList.push(event);
-        return;
-      }
-      if (isSameDay(eventDate, today)) {
-        todayList.push(event);
-      } else {
-        nextList.push(event);
-      }
-    });
+        return searchableText.includes(normalizedSearchQuery);
+      });
 
-    return { todayEvents: todayList, nextWeekEvents: nextList };
-  }, [events, feeFilter, searchQuery]);
+      filteredEvents.forEach((event) => {
+        if (hasEventPassed(event)) {
+          pastList.push(event);
+          return;
+        }
+
+        if (!event.start_at) {
+          laterList.push(event);
+          return;
+        }
+
+        const eventDate = new Date(event.start_at);
+        if (Number.isNaN(eventDate.getTime())) {
+          laterList.push(event);
+          return;
+        }
+
+        const eventDay = new Date(eventDate);
+        eventDay.setHours(0, 0, 0, 0);
+        const diffDays = Math.floor(
+          (eventDay.getTime() - startOfSelectedDay.getTime()) / msInDay,
+        );
+
+        if (isSameDay(eventDay, startOfSelectedDay)) {
+          todayList.push(event);
+          return;
+        }
+
+        if (diffDays >= 1 && diffDays <= 7) {
+          upcomingWeekList.push(event);
+          return;
+        }
+
+        laterList.push(event);
+      });
+
+      return {
+        todayEvents: todayList,
+        upcomingWeekEvents: upcomingWeekList,
+        laterEvents: laterList,
+        pastEvents: pastList,
+      };
+    }, [events, feeFilter, hasEventPassed, searchQuery, selectedDate]);
 
   const visibleEvents = useMemo(
-    () => [...todayEvents, ...nextWeekEvents],
-    [todayEvents, nextWeekEvents],
+    () =>
+      showPastEvents
+        ? [...todayEvents, ...upcomingWeekEvents, ...laterEvents, ...pastEvents]
+        : [...todayEvents, ...upcomingWeekEvents, ...laterEvents],
+    [laterEvents, pastEvents, showPastEvents, todayEvents, upcomingWeekEvents],
   );
 
   useEffect(() => {
@@ -498,10 +592,12 @@ export default function EventTabScreen() {
 
           <View className="mt-6 flex-row items-center justify-between">
             <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Today
+              {selectedChip
+                ? `${selectedChip.day} ${selectedChip.date}`
+                : "Selected Day"}
             </AppText>
             <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-              {todayEvents.length} Events
+              {selectedDayEvents.length} Events
             </AppText>
           </View>
 
@@ -644,31 +740,64 @@ export default function EventTabScreen() {
 
               <View className="mt-6 flex-row items-center justify-between">
                 <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  Today
+                  {selectedChip
+                    ? `${selectedChip.day} ${selectedChip.date}`
+                    : "Selected Day"}
                 </AppText>
                 <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-                  {todayEvents.length} Events
+                  {todayEvents.length} Today
                 </AppText>
+              </View>
+
+              <View className="mt-3 flex-row items-center justify-between">
+                <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Past Events
+                </AppText>
+                <Pressable
+                  onPress={() => setShowPastEvents((prev) => !prev)}
+                  className="rounded-full bg-slate-100 px-3 py-1.5 dark:bg-slate-900"
+                >
+                  <AppText className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    {showPastEvents ? "Hide" : `Show (${pastEvents.length})`}
+                  </AppText>
+                </Pressable>
               </View>
               <View className="h-3" />
             </>
           }
           renderItem={({ item: event, index }) => {
-            const eventEndDate = event.end_at ? new Date(event.end_at) : null;
-            const hasPassed = eventEndDate
-              ? !Number.isNaN(eventEndDate.getTime()) &&
-                eventEndDate.getTime() < Date.now()
-              : false;
+            const hasPassed = hasEventPassed(event);
+            const upcomingWeekStartIndex = todayEvents.length;
+            const laterStartIndex = todayEvents.length + upcomingWeekEvents.length;
+            const pastStartIndex =
+              todayEvents.length + upcomingWeekEvents.length + laterEvents.length;
 
             return (
               <>
-                {index === todayEvents.length ? (
+                {index === upcomingWeekStartIndex &&
+                upcomingWeekEvents.length > 0 ? (
                   <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    Next Week
+                    Next 7 Days
+                  </AppText>
+                ) : null}
+                {index === laterStartIndex && laterEvents.length > 0 ? (
+                  <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Later
+                  </AppText>
+                ) : null}
+                {index === pastStartIndex && pastEvents.length > 0 ? (
+                  <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Past Events
                   </AppText>
                 ) : null}
                 <View
-                  className={index === todayEvents.length ? "mt-3" : undefined}
+                  className={
+                    index === upcomingWeekStartIndex ||
+                    index === laterStartIndex ||
+                    index === pastStartIndex
+                      ? "mt-3"
+                      : undefined
+                  }
                 >
                   <EventCard
                     title={event.title}
@@ -685,7 +814,7 @@ export default function EventTabScreen() {
                       resolveEventCoverUrl(event.cover_url) ??
                       fallbackEventImage
                     }
-                    badge={index < todayEvents.length ? "Today" : undefined}
+                    badge={index < todayEvents.length ? "Selected" : undefined}
                     hasPassed={hasPassed}
                     host={event.host_name ? `By ${event.host_name}` : undefined}
                     iconColor={iconColor}
@@ -696,12 +825,27 @@ export default function EventTabScreen() {
             );
           }}
           ItemSeparatorComponent={() => <View className="h-4" />}
+          onEndReachedThreshold={0.35}
+          onEndReached={() => {
+            if (!isLoadingMore && hasMore) {
+              void loadEvents();
+            }
+          }}
           ListFooterComponent={
             <>
-              {nextWeekEvents.length === 0 ? (
-                <AppText className="mt-8 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  Next Week
-                </AppText>
+              {isLoadingMore ? (
+                <View className="mt-4">
+                  <AppText className="text-center text-xs text-slate-400 dark:text-slate-500">
+                    Loading more events...
+                  </AppText>
+                </View>
+              ) : null}
+              {!hasMore && visibleEvents.length > 0 ? (
+                <View className="mt-4">
+                  <AppText className="text-center text-xs text-slate-400 dark:text-slate-500">
+                    You are all caught up!
+                  </AppText>
+                </View>
               ) : null}
               <View className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-white/70 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                 <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -738,7 +882,7 @@ export default function EventTabScreen() {
         visible={Boolean(errorMessage)}
         message={errorMessage}
         onClose={() => setErrorMessage(null)}
-        onRetry={() => void loadEvents()}
+        onRetry={() => void loadEvents(true)}
       />
     </SafeAreaView>
   );
