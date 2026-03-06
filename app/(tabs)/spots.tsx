@@ -41,6 +41,7 @@ const fallbackSpotImage =
   "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800&q=80";
 
 export default function SpotsTabScreen() {
+  const PAGE_SIZE = 15;
   const router = useRouter();
   const { colors } = useTheme();
   const scheme = useColorScheme();
@@ -50,11 +51,16 @@ export default function SpotsTabScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [spots, setSpots] = useState<SpotItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [highestSeenIndex, setHighestSeenIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<SpotItem>>(null);
   const spotsLengthRef = useRef(0);
+  const nextPageRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const isFetchingRef = useRef(false);
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
     muted: scheme === "dark" ? "#94A3B8" : "#64748B",
@@ -62,35 +68,74 @@ export default function SpotsTabScreen() {
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
 
-  const loadSpots = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  const loadSpots = useCallback(
+    async (reset = false) => {
+      if (isFetchingRef.current) return;
+      if (!reset && !hasMoreRef.current) return;
 
-    let query = supabase
-      .from("spots")
-      .select(
-        "id, name, category, location, rating_avg, review_count, price_type, cover_url",
-      )
-      .order("created_at", { ascending: false });
+      isFetchingRef.current = true;
+      if (reset) {
+        nextPageRef.current = 0;
+        hasMoreRef.current = true;
+        setHasMore(true);
+        setIsLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
+      setErrorMessage(null);
 
-    if (activeCategory !== "All") {
-      query = query.eq("category", activeCategory);
-    }
+      const from = nextPageRef.current * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
 
-    const { data, error } = await query;
+      let query = supabase
+        .from("spots")
+        .select(
+          "id, name, category, location, rating_avg, review_count, price_type, cover_url",
+        )
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
-    if (error) {
-      setErrorMessage(error.message);
-      setSpots([]);
-    } else {
-      setSpots((data ?? []) as SpotItem[]);
-    }
+      if (activeCategory !== "All") {
+        query = query.eq("category", activeCategory);
+      }
 
-    setIsLoading(false);
-  }, [activeCategory]);
+      const { data, error } = await query;
+
+      if (error) {
+        setErrorMessage(error.message);
+        if (reset) {
+          setSpots([]);
+        }
+      } else {
+        const rows = (data ?? []) as SpotItem[];
+        setSpots((prev) => {
+          if (reset) return rows;
+
+          const existingIds = new Set(prev.map((item) => item.id));
+          const nextRows = rows.filter((item) => !existingIds.has(item.id));
+          return [...prev, ...nextRows];
+        });
+
+        if (rows.length > 0) {
+          nextPageRef.current += 1;
+        }
+        const nextHasMore = rows.length === PAGE_SIZE;
+        hasMoreRef.current = nextHasMore;
+        setHasMore(nextHasMore);
+      }
+
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
+      isFetchingRef.current = false;
+    },
+    [activeCategory],
+  );
 
   useEffect(() => {
-    void loadSpots();
+    void loadSpots(true);
   }, [loadSpots]);
 
   const visibleSpots = useMemo(() => {
@@ -413,6 +458,30 @@ export default function SpotsTabScreen() {
             );
           }}
           ItemSeparatorComponent={() => <View className="h-4" />}
+          onEndReachedThreshold={0.35}
+          onEndReached={() => {
+            if (!isLoadingMore && hasMore) {
+              void loadSpots();
+            }
+          }}
+          ListFooterComponent={
+            <>
+              {isLoadingMore ? (
+                <View className="mt-3">
+                  <AppText className="text-center text-xs text-slate-400 dark:text-slate-500">
+                    Loading more spots...
+                  </AppText>
+                </View>
+              ) : null}
+              {!hasMore && visibleSpots.length > 0 ? (
+                <View className="mt-3">
+                  <AppText className="text-center text-xs text-slate-400 dark:text-slate-500">
+                    You are all caught up!
+                  </AppText>
+                </View>
+              ) : null}
+            </>
+          }
         />
       )}
 
@@ -438,7 +507,7 @@ export default function SpotsTabScreen() {
         visible={Boolean(errorMessage)}
         message={errorMessage}
         onClose={() => setErrorMessage(null)}
-        onRetry={() => void loadSpots()}
+        onRetry={() => void loadSpots(true)}
       />
     </SafeAreaView>
   );

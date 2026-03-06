@@ -93,12 +93,15 @@ function ProjectCardSkeleton() {
 }
 
 export default function ProjectsTabScreen() {
+  const PAGE_SIZE = 12;
   const { statusBarStyle } = useTheme();
   const { session } = useSupabase();
   const router = useRouter();
   const scheme = useColorScheme();
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"recent" | "views" | "likes">("recent");
   const [showSort, setShowSort] = useState(false);
@@ -106,6 +109,9 @@ export default function ProjectsTabScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<ProjectItem>>(null);
   const projectsLengthRef = useRef(0);
+  const nextPageRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const isFetchingRef = useRef(false);
   const iconColors = {
     text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
     muted: scheme === "dark" ? "#94A3B8" : "#64748B",
@@ -114,83 +120,125 @@ export default function ProjectsTabScreen() {
     chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
   };
 
-  const loadProjects = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  const loadProjects = useCallback(
+    async (reset = false) => {
+      if (isFetchingRef.current) return;
+      if (!reset && !hasMoreRef.current) return;
 
-    let query = supabase
-      .from("projects")
-      .select(
-        "id, user_id, is_anonymous, title, summary, tags, created_at, views, likes, cover_url",
-      );
+      isFetchingRef.current = true;
+      if (reset) {
+        nextPageRef.current = 0;
+        hasMoreRef.current = true;
+        setHasMore(true);
+        setIsLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
+      setErrorMessage(null);
 
-    query =
-      sortBy === "views"
-        ? query.order("views", { ascending: false })
-        : sortBy === "likes"
-          ? query.order("likes", { ascending: false })
-          : query.order("created_at", { ascending: false });
+      const from = nextPageRef.current * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
 
-    const { data, error } = await query;
+      let query = supabase
+        .from("projects")
+        .select(
+          "id, user_id, is_anonymous, title, summary, tags, created_at, views, likes, cover_url",
+        )
+        .range(from, to);
 
-    if (error) {
-      setErrorMessage(error.message);
-      setProjects([]);
-    } else {
-      const rows = (data ?? []) as ProjectItem[];
-      const projectIds = rows.map((project) => project.id);
-      const userIds = Array.from(
-        new Set(
-          rows
-            .filter((project) => !project.is_anonymous && project.user_id)
-            .map((project) => project.user_id as string),
-        ),
-      );
+      query =
+        sortBy === "views"
+          ? query.order("views", { ascending: false })
+          : sortBy === "likes"
+            ? query.order("likes", { ascending: false })
+            : query.order("created_at", { ascending: false });
 
-      let profileMap = new Map<string, ProjectItem["profile"]>();
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("user_id, full_name, username, avatar_url")
-          .in("user_id", userIds);
+      const { data, error } = await query;
 
-        profileMap = new Map(
-          (profiles ?? []).map((profile) => [profile.user_id, profile]),
+      if (error) {
+        setErrorMessage(error.message);
+        if (reset) {
+          setProjects([]);
+        }
+      } else {
+        const rows = (data ?? []) as ProjectItem[];
+        const projectIds = rows.map((project) => project.id);
+        const userIds = Array.from(
+          new Set(
+            rows
+              .filter((project) => !project.is_anonymous && project.user_id)
+              .map((project) => project.user_id as string),
+          ),
         );
-      }
 
-      let likeMap = new Map<string, boolean>();
-      if (session?.user?.id && projectIds.length > 0) {
-        const { data: likes } = await supabase
-          .from("project_likes")
-          .select("project_id")
-          .in("project_id", projectIds)
-          .eq("user_id", session.user.id);
+        let profileMap = new Map<string, ProjectItem["profile"]>();
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, full_name, username, avatar_url")
+            .in("user_id", userIds);
 
-        likeMap = new Map((likes ?? []).map((like) => [like.project_id, true]));
-      }
+          profileMap = new Map(
+            (profiles ?? []).map((profile) => [profile.user_id, profile]),
+          );
+        }
 
-      setProjects(
-        rows.map((project) => ({
+        let likeMap = new Map<string, boolean>();
+        if (session?.user?.id && projectIds.length > 0) {
+          const { data: likes } = await supabase
+            .from("project_likes")
+            .select("project_id")
+            .in("project_id", projectIds)
+            .eq("user_id", session.user.id);
+
+          likeMap = new Map(
+            (likes ?? []).map((like) => [like.project_id, true]),
+          );
+        }
+
+        const hydratedRows = rows.map((project) => ({
           ...project,
           profile: project.user_id
             ? profileMap.get(project.user_id)
             : undefined,
           is_liked: likeMap.get(project.id) ?? false,
-        })),
-      );
-    }
+        }));
 
-    setIsLoading(false);
-  }, [session?.user?.id, sortBy]);
+        setProjects((prev) => {
+          if (reset) return hydratedRows;
+
+          const existingIds = new Set(prev.map((item) => item.id));
+          const nextRows = hydratedRows.filter(
+            (item) => !existingIds.has(item.id),
+          );
+          return [...prev, ...nextRows];
+        });
+
+        if (rows.length > 0) {
+          nextPageRef.current += 1;
+        }
+        const nextHasMore = rows.length === PAGE_SIZE;
+        hasMoreRef.current = nextHasMore;
+        setHasMore(nextHasMore);
+      }
+
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
+      isFetchingRef.current = false;
+    },
+    [session?.user?.id, sortBy],
+  );
 
   useEffect(() => {
-    void loadProjects();
+    void loadProjects(true);
   }, [loadProjects]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadProjects();
+      void loadProjects(true);
       return undefined;
     }, [loadProjects]),
   );
@@ -609,6 +657,30 @@ export default function ProjectsTabScreen() {
               </View>
             </Pressable>
           )}
+          onEndReachedThreshold={0.35}
+          onEndReached={() => {
+            if (!isLoadingMore && hasMore) {
+              void loadProjects();
+            }
+          }}
+          ListFooterComponent={
+            <>
+              {isLoadingMore ? (
+                <View className="mt-4">
+                  <AppText className="text-center text-xs text-slate-400 dark:text-slate-500">
+                    Loading more projects...
+                  </AppText>
+                </View>
+              ) : null}
+              {!hasMore && projects.length > 0 ? (
+                <View className="mt-4">
+                  <AppText className="text-center text-xs text-slate-400 dark:text-slate-500">
+                    You are all caught up!
+                  </AppText>
+                </View>
+              ) : null}
+            </>
+          }
         />
       )}
 
@@ -635,7 +707,7 @@ export default function ProjectsTabScreen() {
         visible={Boolean(errorMessage)}
         message={errorMessage}
         onClose={() => setErrorMessage(null)}
-        onRetry={() => void loadProjects()}
+        onRetry={() => void loadProjects(true)}
       />
     </SafeAreaView>
   );

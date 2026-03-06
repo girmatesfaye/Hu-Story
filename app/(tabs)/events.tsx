@@ -346,7 +346,7 @@ export default function EventTabScreen() {
       const msInDay = 24 * 60 * 60 * 1000;
       const startOfSelectedDay = new Date(selectedDate);
       startOfSelectedDay.setHours(0, 0, 0, 0);
-    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+      const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
       const filteredEvents = events.filter((event) => {
         const matchesFee =
@@ -597,7 +597,7 @@ export default function EventTabScreen() {
                 : "Selected Day"}
             </AppText>
             <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-              {selectedDayEvents.length} Events
+              {todayEvents.length} Today
             </AppText>
           </View>
 
@@ -768,9 +768,12 @@ export default function EventTabScreen() {
           renderItem={({ item: event, index }) => {
             const hasPassed = hasEventPassed(event);
             const upcomingWeekStartIndex = todayEvents.length;
-            const laterStartIndex = todayEvents.length + upcomingWeekEvents.length;
+            const laterStartIndex =
+              todayEvents.length + upcomingWeekEvents.length;
             const pastStartIndex =
-              todayEvents.length + upcomingWeekEvents.length + laterEvents.length;
+              todayEvents.length +
+              upcomingWeekEvents.length +
+              laterEvents.length;
 
             return (
               <>
