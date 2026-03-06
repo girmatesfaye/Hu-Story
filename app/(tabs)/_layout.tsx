@@ -1,9 +1,9 @@
 import { Tabs } from "expo-router";
 import React from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
 import Entypo from "@expo/vector-icons/Entypo";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../hooks/useTheme";
 import { StatusBar } from "expo-status-bar";
 
@@ -27,6 +27,9 @@ export default function TabLayout() {
           tabBarStyle: {
             backgroundColor: colors.surface,
           },
+          tabBarLabelStyle: {
+            fontFamily: "LexendRegular",
+          },
           tabBarActiveTintColor: colors.tabActive,
           tabBarInactiveTintColor: colors.tabInactive,
         }}
@@ -36,16 +39,11 @@ export default function TabLayout() {
           options={{
             title: "Rants",
             tabBarIcon: ({ color }) => (
-              <FontAwesome name="microphone" size={24} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="events"
-          options={{
-            title: "Events",
-            tabBarIcon: ({ color }) => (
-              <MaterialIcons name="event-available" size={24} color={color} />
+              <Ionicons
+                name="chatbox-ellipses-outline"
+                size={24}
+                color={color}
+              />
             ),
           }}
         />
@@ -54,7 +52,16 @@ export default function TabLayout() {
           options={{
             title: "Spots",
             tabBarIcon: ({ color }) => (
-              <Entypo name="location" size={24} color={color} />
+              <Ionicons name="compass-outline" size={28} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="events"
+          options={{
+            title: "Events",
+            tabBarIcon: ({ color }) => (
+              <Ionicons name="calendar-outline" size={24} color={color} />
             ),
           }}
         />
@@ -76,11 +83,7 @@ export default function TabLayout() {
           options={{
             title: "Profile",
             tabBarIcon: ({ color }) => (
-              <MaterialCommunityIcons
-                name="face-man-profile"
-                size={24}
-                color={color}
-              />
+              <Ionicons name="person-outline" size={24} color={color} />
             ),
           }}
         />
