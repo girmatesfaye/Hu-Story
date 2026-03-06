@@ -14,12 +14,12 @@ import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
 import { Pressable } from "react-native";
-import { useColorScheme } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { formatTimeAgo } from "../../lib/ui/formatters";
 
 type ProjectItem = {
   id: string;
@@ -42,23 +42,6 @@ type ProjectItem = {
 
 const fallbackAvatar =
   "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=80&q=80";
-
-const fallbackCover =
-  "https://images.unsplash.com/photo-1483721310020-03333e577078?auto=format&fit=crop&w=1200&q=80";
-
-const formatTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-};
 
 function ProjectCardSkeleton() {
   return (
@@ -94,10 +77,9 @@ function ProjectCardSkeleton() {
 
 export default function ProjectsTabScreen() {
   const PAGE_SIZE = 12;
-  const { statusBarStyle } = useTheme();
+  const { statusBarStyle, colors } = useTheme();
   const { session } = useSupabase();
   const router = useRouter();
-  const scheme = useColorScheme();
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -112,13 +94,6 @@ export default function ProjectsTabScreen() {
   const nextPageRef = useRef(0);
   const hasMoreRef = useRef(true);
   const isFetchingRef = useRef(false);
-  const iconColors = {
-    text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
-    muted: scheme === "dark" ? "#94A3B8" : "#64748B",
-    accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
-    danger: scheme === "dark" ? "#F87171" : "#DC2626",
-    chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
-  };
 
   const loadProjects = useCallback(
     async (reset = false) => {
@@ -374,7 +349,7 @@ export default function ProjectsTabScreen() {
               <Ionicons
                 name="options-outline"
                 size={20}
-                color={iconColors.accent}
+                color={colors.accent}
               />
             </TouchableOpacity>
           </View>
@@ -486,7 +461,7 @@ export default function ProjectsTabScreen() {
                   <Ionicons
                     name="options-outline"
                     size={20}
-                    color={statusBarStyle === "light" ? "#E5E7EB" : "#0F172A"}
+                    color={colors.text}
                   />
                 </TouchableOpacity>
               </View>
@@ -625,9 +600,7 @@ export default function ProjectsTabScreen() {
                       <Ionicons
                         name="eye-outline"
                         size={18}
-                        color={
-                          statusBarStyle === "light" ? "#94A3B8" : "#64748B"
-                        }
+                        color={colors.mutedText}
                       />
                       <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
                         {project.views}
@@ -641,11 +614,7 @@ export default function ProjectsTabScreen() {
                         name={project.is_liked ? "heart" : "heart-outline"}
                         size={18}
                         color={
-                          project.is_liked
-                            ? iconColors.danger
-                            : statusBarStyle === "light"
-                              ? "#94A3B8"
-                              : "#64748B"
+                          project.is_liked ? colors.danger : colors.mutedText
                         }
                       />
                       <AppText className="ml-2 text-sm text-slate-400 dark:text-slate-500">
@@ -700,7 +669,7 @@ export default function ProjectsTabScreen() {
         onPress={() => router.push("/projects/create-projects")}
         className="absolute right-6 bottom-6 w-14 h-14 rounded-full items-center justify-center bg-green-600 dark:bg-green-400 shadow-lg"
       >
-        <Ionicons name="add" size={26} color={iconColors.chipText} />
+        <Ionicons name="add" size={26} color={colors.chipActiveText} />
       </Pressable>
 
       <FetchErrorModal

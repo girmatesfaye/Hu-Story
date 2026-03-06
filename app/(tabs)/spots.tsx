@@ -20,8 +20,8 @@ import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
+import { TabHeader } from "../../components/TabHeader";
 import { useTheme } from "../../hooks/useTheme";
-import { useColorScheme } from "react-native";
 import { supabase } from "../../lib/supabase";
 import AntDesign from "@expo/vector-icons/build/AntDesign";
 import { SPOT_FILTER_CATEGORIES } from "../../constants/categories";
@@ -44,7 +44,6 @@ export default function SpotsTabScreen() {
   const PAGE_SIZE = 15;
   const router = useRouter();
   const { colors } = useTheme();
-  const scheme = useColorScheme();
   const [activeCategory, setActiveCategory] = useState<string>(
     SPOT_FILTER_CATEGORIES[0],
   );
@@ -61,12 +60,6 @@ export default function SpotsTabScreen() {
   const nextPageRef = useRef(0);
   const hasMoreRef = useRef(true);
   const isFetchingRef = useRef(false);
-  const iconColors = {
-    text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
-    muted: scheme === "dark" ? "#94A3B8" : "#64748B",
-    accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
-    chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
-  };
 
   const loadSpots = useCallback(
     async (reset = false) => {
@@ -219,26 +212,13 @@ export default function SpotsTabScreen() {
     >
       {isLoading ? (
         <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
-          <View className="flex-row items-center justify-between">
-            <View>
-              <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
-                Campus Spots
-              </AppText>
-              <AppText className="mt-1 text-sm font-semibold text-slate-500 tracking-wider dark:text-green-400">
-                Find and share the best places around campus.
-              </AppText>
-            </View>
-            <Pressable
-              onPress={() => router.push("../notifications/notification")}
-              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color={iconColors.text}
-              />
-            </Pressable>
-          </View>
+          <TabHeader
+            title="Campus Spots"
+            subtitle="Find and share the best places around campus."
+            onPressNotification={() =>
+              router.push("/notifications/notification")
+            }
+          />
 
           <View className="mt-5 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
             <Ionicons
@@ -323,26 +303,13 @@ export default function SpotsTabScreen() {
           }}
           ListHeaderComponent={
             <>
-              <View className="flex-row items-center justify-between">
-                <View>
-                  <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                    Campus Spots
-                  </AppText>
-                  <AppText className="mt-1 text-sm font-semibold text-slate-500 tracking-wider dark:text-green-400">
-                    Find and share the best places around campus.
-                  </AppText>
-                </View>
-                <Pressable
-                  onPress={() => router.push("../notifications/notification")}
-                  className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-                >
-                  <Ionicons
-                    name="notifications-outline"
-                    size={22}
-                    color={iconColors.text}
-                  />
-                </Pressable>
-              </View>
+              <TabHeader
+                title="Campus Spots"
+                subtitle="Find and share the best places around campus."
+                onPressNotification={() =>
+                  router.push("/notifications/notification")
+                }
+              />
 
               <View className="mt-5 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
                 <Ionicons
@@ -432,7 +399,7 @@ export default function SpotsTabScreen() {
 
                   <View className="mt-2 flex-row items-center justify-between">
                     <View className="flex-row items-center gap-1">
-                      <Ionicons name="star" size={14} color="#F59E0B" />
+                      <Ionicons name="star" size={14} color={colors.warning} />
                       <AppText className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                         {spot.rating_avg.toFixed(1)}
                       </AppText>

@@ -23,6 +23,7 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../../hooks/useTheme";
+import { formatTimeAgo } from "../../lib/ui/formatters";
 
 type RantDetail = {
   id: string;
@@ -50,20 +51,6 @@ type RantComment = {
   is_anonymous?: boolean;
   parent_comment_id?: string | null;
   is_liked?: boolean;
-};
-
-const formatTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 };
 
 export default function RantCommentsScreen() {
@@ -102,25 +89,6 @@ export default function RantCommentsScreen() {
 
   const fallbackAvatar =
     "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=80&q=80";
-
-  const commentById = new Map(comments.map((comment) => [comment.id, comment]));
-  const depthCache = new Map<string, number>();
-
-  const getDepth = (commentId: string, visited = new Set<string>()): number => {
-    if (depthCache.has(commentId)) return depthCache.get(commentId) as number;
-    if (visited.has(commentId)) return 0;
-    visited.add(commentId);
-
-    const current = commentById.get(commentId);
-    if (!current?.parent_comment_id) {
-      depthCache.set(commentId, 0);
-      return 0;
-    }
-
-    const depth = 1 + getDepth(current.parent_comment_id, visited);
-    depthCache.set(commentId, depth);
-    return depth;
-  };
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
