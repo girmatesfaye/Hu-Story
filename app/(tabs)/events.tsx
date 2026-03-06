@@ -388,7 +388,7 @@ export default function EventTabScreen() {
                 Upcoming Events
               </AppText>
               <AppText className="text-sm text-slate-500  dark:text-green-400">
-                Discover what's happening around campus
+                Discover what's happening around campus.
               </AppText>
             </View>
             <Pressable

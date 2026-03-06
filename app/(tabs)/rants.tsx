@@ -386,7 +386,7 @@ export default function RantsScreen() {
                 HU Rants
               </AppText>
               <AppText className="text-xs mt-[2px] text-slate-500  dark:text-green-400">
-                Hawassa University Anonymous Feed
+                Hawassa University Anonymous Feed.
               </AppText>
             </View>
 
