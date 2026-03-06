@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -8,6 +8,8 @@ import { useTheme } from "../../hooks/useTheme";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import MapView, { Marker } from "react-native-maps";
+import * as Location from "expo-location";
 
 export default function CreateEventScreen() {
   const router = useRouter();
@@ -26,6 +28,13 @@ export default function CreateEventScreen() {
   const [tagsText, setTagsText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [markerCoord, setMarkerCoord] = useState({
+    latitude: 7.0504,
+    longitude: 38.4768,
+  });
+
+  const mapRef = useRef(null);
 
   const parseDateTime = (datePart: string, timePartRaw: string) => {
     const dateTrimmed = datePart.trim();
@@ -48,6 +57,77 @@ export default function CreateEventScreen() {
     )}`;
 
     return `${dateTrimmed}T${timePart}${offset}`;
+  };
+
+  const handleMarkerDragEnd = async (e) => {
+    const newCoordinate = e.nativeEvent.coordinate;
+    setMarkerCoord(newCoordinate);
+
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setLocation(
+          `${newCoordinate.latitude.toFixed(4)}, ${newCoordinate.longitude.toFixed(4)}`
+        );
+        return;
+      }
+
+      let reverseGeocode = await Location.reverseGeocodeAsync(newCoordinate);
+      if (reverseGeocode.length > 0) {
+        const place = reverseGeocode[0];
+        const address = [place.name, place.street, place.city]
+          .filter(Boolean)
+          .join(", ");
+        setLocation(address || "Unknown Location");
+      } else {
+        setLocation(
+          `${newCoordinate.latitude.toFixed(4)}, ${newCoordinate.longitude.toFixed(4)}`
+        );
+      }
+    } catch (error) {
+      setLocation(
+        `${newCoordinate.latitude.toFixed(4)}, ${newCoordinate.longitude.toFixed(4)}`
+      );
+    }
+  };
+
+  const handleLocationSearch = async () => {
+    if (!location.trim()) return;
+
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setErrorMessage("Permission to access location was denied");
+        return;
+      }
+
+      let searchQuery = location.trim();
+      if (!searchQuery.toLowerCase().includes("hawassa")) {
+        searchQuery = `${searchQuery}, Hawassa, Ethiopia`;
+      }
+
+      let geocodeResult = await Location.geocodeAsync(searchQuery);
+      
+      if (geocodeResult.length > 0) {
+        const { latitude, longitude } = geocodeResult[0];
+        const newCoord = { latitude, longitude };
+        
+        setMarkerCoord(newCoord);
+        
+        mapRef.current?.animateToRegion(
+          {
+            ...newCoord,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          },
+          1000
+        );
+      } else {
+        console.log("Location not found in Hawassa");
+      }
+    } catch (error) {
+      console.log("Error finding location:", error);
+    }
   };
 
   const handleSubmit = async () => {
@@ -112,7 +192,6 @@ export default function CreateEventScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1 bg-white dark:bg-slate-950">
-        {/* Header */}
         <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <Pressable
             onPress={() => router.back()}
@@ -223,49 +302,56 @@ export default function CreateEventScreen() {
             </View>
           </View>
 
+          {/* Updated "Where" Section with Search Button */}
           <View className="mt-6 flex-row items-center justify-between">
             <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Where
             </AppText>
-            <Pressable className="flex-row items-center gap-2">
-              <Ionicons name="map-outline" size={14} color={colors.accent} />
-              <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-                Select on Map
-              </AppText>
+          </View>
+          <View className="mt-2 flex-row items-center gap-3">
+            <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <Ionicons
+                name="location-outline"
+                size={16}
+                color={colors.mutedText}
+              />
+              <TextInput
+                placeholder="Type an address and press Search..."
+                placeholderTextColor={colors.mutedStrong}
+                className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                value={location}
+                onChangeText={setLocation}
+                onSubmitEditing={handleLocationSearch}
+                returnKeyType="search"
+              />
+            </View>
+            <Pressable 
+              onPress={handleLocationSearch}
+              className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            >
+              <Ionicons name="search" size={18} color={colors.accent} />
             </Pressable>
           </View>
-          <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <TextInput
-              placeholder="e.g., Main Campus Hall"
-              placeholderTextColor={colors.mutedStrong}
-              className="text-sm text-slate-900 dark:text-slate-100"
-              value={location}
-              onChangeText={setLocation}
-            />
-          </View>
 
-          <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-            <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80",
+          <View className="mt-3 h-48 w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+            <MapView
+              ref={mapRef}
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: 7.0504,
+                longitude: 38.4768,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
               }}
-              className="h-[140px] w-full"
-              resizeMode="cover"
-            />
-            <View className="absolute inset-0 bg-white/40 dark:bg-slate-950/40" />
-            <View className="absolute inset-0 items-center justify-center">
-              <View className="flex-row items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow dark:bg-slate-900">
-                <Ionicons name="location" size={14} color={colors.accent} />
-                <AppText className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Hawassa Main Campus
-                </AppText>
-              </View>
-            </View>
-            <View className="absolute bottom-3 right-3 items-center gap-1 rounded-lg bg-white px-2 py-1 shadow dark:bg-slate-900">
-              <Ionicons name="add" size={14} color={colors.mutedText} />
-              <View className="h-px w-4 bg-slate-200 dark:bg-slate-800" />
-              <Ionicons name="remove" size={14} color={colors.mutedText} />
-            </View>
+            >
+              <Marker
+                draggable
+                coordinate={markerCoord}
+                onDragEnd={handleMarkerDragEnd}
+                title="Event Location"
+                description="Drag to set location"
+              />
+            </MapView>
           </View>
 
           <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
@@ -405,4 +491,3 @@ export default function CreateEventScreen() {
     </SafeAreaView>
   );
 }
-

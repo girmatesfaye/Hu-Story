@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Pressable,
   ScrollView,
@@ -14,6 +14,8 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+import MapView, { Marker } from "react-native-maps";
+import * as Location from "expo-location";
 
 const categories = ["Cafe", "Library", "Hangout", "Study", "Food", "Other"];
 
@@ -35,6 +37,84 @@ export default function CreateSpotScreen() {
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Map States and Refs
+  const [markerCoord, setMarkerCoord] = useState({
+    latitude: 7.0504,
+    longitude: 38.4768,
+  });
+  const mapRef = useRef(null);
+
+  // Handle dragging the pin to get the address
+  const handleMarkerDragEnd = async (e) => {
+    const newCoordinate = e.nativeEvent.coordinate;
+    setMarkerCoord(newCoordinate);
+
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setLocation(
+          `${newCoordinate.latitude.toFixed(4)}, ${newCoordinate.longitude.toFixed(4)}`
+        );
+        return;
+      }
+
+      let reverseGeocode = await Location.reverseGeocodeAsync(newCoordinate);
+      if (reverseGeocode.length > 0) {
+        const place = reverseGeocode[0];
+        const address = [place.name, place.street, place.city]
+          .filter(Boolean)
+          .join(", ");
+        setLocation(address || "Unknown Location");
+      } else {
+        setLocation(
+          `${newCoordinate.latitude.toFixed(4)}, ${newCoordinate.longitude.toFixed(4)}`
+        );
+      }
+    } catch (error) {
+      setLocation(
+        `${newCoordinate.latitude.toFixed(4)}, ${newCoordinate.longitude.toFixed(4)}`
+      );
+    }
+  };
+
+  // Handle typing an address to move the pin
+  const handleLocationSearch = async () => {
+    if (!location.trim()) return;
+
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setErrorMessage("Permission to access location was denied");
+        return;
+      }
+
+      let searchQuery = location.trim();
+      if (!searchQuery.toLowerCase().includes("hawassa")) {
+        searchQuery = `${searchQuery}, Hawassa, Ethiopia`;
+      }
+
+      let geocodeResult = await Location.geocodeAsync(searchQuery);
+      
+      if (geocodeResult.length > 0) {
+        const { latitude, longitude } = geocodeResult[0];
+        const newCoord = { latitude, longitude };
+        
+        setMarkerCoord(newCoord);
+        
+        mapRef.current?.animateToRegion(
+          {
+            ...newCoord,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          },
+          1000
+        );
+      }
+    } catch (error) {
+      console.log("Error finding location:", error);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!session?.user) {
@@ -160,16 +240,43 @@ export default function CreateSpotScreen() {
                 color={colors.mutedText}
               />
               <TextInput
-                placeholder="e.g. Main Campus"
+                placeholder="Type and press search..."
                 placeholderTextColor={colors.mutedStrong}
                 className="flex-1 text-sm text-slate-900 dark:text-slate-100"
                 value={location}
                 onChangeText={setLocation}
+                onSubmitEditing={handleLocationSearch} // Triggers when keyboard 'Enter' is pressed
+                returnKeyType="search"
               />
             </View>
-            <Pressable className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <Ionicons name="map" size={18} color={colors.accent} />
+            <Pressable 
+              onPress={handleLocationSearch}
+              className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            >
+              <Ionicons name="search" size={18} color={colors.accent} />
             </Pressable>
+          </View>
+
+          {/* Interactive Map moved right here! */}
+          <View className="mt-4 h-48 w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+            <MapView
+              ref={mapRef}
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: 7.0504,
+                longitude: 38.4768,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+              }}
+            >
+              <Marker
+                draggable
+                coordinate={markerCoord}
+                onDragEnd={handleMarkerDragEnd}
+                title="Spot Location"
+                description="Drag to set location"
+              />
+            </MapView>
           </View>
 
           <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
