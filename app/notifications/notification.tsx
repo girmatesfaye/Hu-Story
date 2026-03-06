@@ -243,7 +243,7 @@ export default function NotificationScreen() {
               accessibilityRole="button"
               onPress={handleMarkAllRead}
             >
-              <AppText className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              <AppText className="text-sm font-semibold text-green-600 dark:text-emerald-400">
                 Mark all read
               </AppText>
             </TouchableOpacity>
@@ -262,7 +262,7 @@ export default function NotificationScreen() {
                   key={filter}
                   className={`rounded-full px-4 py-2 ${
                     isActive
-                      ? "bg-emerald-600"
+                      ? "bg-green-600"
                       : "border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
                   }`}
                   accessibilityRole="button"

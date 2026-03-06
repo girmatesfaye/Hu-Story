@@ -315,7 +315,7 @@ export default function ProjectsTabScreen() {
                 Campus Projects
               </AppText>
               <AppText className="mt-1 text-sm text-slate-500  dark:text-green-400">
-                Discover what peers are building
+                Discover what peers are building.
               </AppText>
             </View>
             <TouchableOpacity

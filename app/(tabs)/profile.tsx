@@ -467,7 +467,7 @@ export default function ProfileTabScreen() {
               />
             </TouchableOpacity>
             <TouchableOpacity
-              className="absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full bg-emerald-600 shadow-md"
+              className="absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full bg-green-600 shadow-md"
               accessibilityRole="button"
               onPress={() => router.push("/profiles/edit-profile")}
             >
