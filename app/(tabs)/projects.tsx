@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import { useFocusEffect } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type ProjectItem = {
   id: string;
@@ -300,7 +301,7 @@ export default function ProjectsTabScreen() {
   };
 
   return (
-    <View className="flex-1 bg-slate-50 dark:bg-slate-950">
+    <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
       <StatusBar style={statusBarStyle} translucent={false} />
       {isLoading ? (
         <ScrollView
@@ -310,7 +311,7 @@ export default function ProjectsTabScreen() {
         >
           <View className="flex-row items-start justify-between">
             <View className="flex-1 pr-4">
-              <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+              <AppText className="text-[22px]  font-semibold text-slate-900 dark:text-slate-100">
                 Campus Projects
               </AppText>
               <AppText className="mt-1 text-sm text-slate-500  dark:text-green-400">
@@ -318,14 +319,14 @@ export default function ProjectsTabScreen() {
               </AppText>
             </View>
             <TouchableOpacity
-              className="h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-slate-900"
+              className="h-12 w-12 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-400/20"
               accessibilityRole="button"
               onPress={() => setShowSort((prev) => !prev)}
             >
               <Ionicons
                 name="options-outline"
                 size={20}
-                color={statusBarStyle === "light" ? "#E5E7EB" : "#0F172A"}
+                color={iconColors.accent}
               />
             </TouchableOpacity>
           </View>
@@ -636,6 +637,6 @@ export default function ProjectsTabScreen() {
         onClose={() => setErrorMessage(null)}
         onRetry={() => void loadProjects()}
       />
-    </View>
+    </SafeAreaView>
   );
 }

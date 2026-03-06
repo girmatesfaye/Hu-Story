@@ -8,6 +8,7 @@ import {
   ViewToken,
   useColorScheme,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { ReportModal } from "../../components/ReportModal";
@@ -373,7 +374,7 @@ export default function RantsScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white dark:bg-slate-950">
+    <SafeAreaView edges={["top"]} className="flex-1 bg-white dark:bg-slate-950">
       {isLoading ? (
         <ScrollView contentContainerClassName="px-5 pt-5 pb-20">
           <View className="flex-row items-center justify-between mb-4">
@@ -668,6 +669,6 @@ export default function RantsScreen() {
         onClose={() => setErrorMessage(null)}
         onRetry={() => void loadRants()}
       />
-    </View>
+    </SafeAreaView>
   );
 }
