@@ -419,7 +419,7 @@ export default function ProfileTabScreen() {
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
-      <StatusBar style={statusBarStyle} />
+      <StatusBar style={statusBarStyle} translucent={false} />
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-5 pb-28"

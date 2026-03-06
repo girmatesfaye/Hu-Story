@@ -15,6 +15,7 @@ export default function TabLayout() {
       <StatusBar
         style={statusBarStyle}
         backgroundColor={colors.headerBackground}
+        translucent={false}
       />
       <Tabs
         screenOptions={{

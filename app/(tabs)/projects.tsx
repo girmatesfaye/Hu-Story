@@ -301,7 +301,7 @@ export default function ProjectsTabScreen() {
 
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
-      <StatusBar style={statusBarStyle} />
+      <StatusBar style={statusBarStyle} translucent={false} />
       {isLoading ? (
         <ScrollView
           className="flex-1"

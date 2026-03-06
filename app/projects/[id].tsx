@@ -239,7 +239,7 @@ export default function ProjectDetailsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1 bg-white dark:bg-slate-950">
-        <StatusBar style={statusBarStyle} />
+        <StatusBar style={statusBarStyle} translucent={false} />
         <View className="flex-row items-center px-5 pb-3 pt-6">
           <TouchableOpacity
             className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900"

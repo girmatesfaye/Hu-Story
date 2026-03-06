@@ -19,10 +19,10 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTheme } from "../../hooks/useTheme";
 
 type RantDetail = {
   id: string;
@@ -30,7 +30,6 @@ type RantDetail = {
   content: string;
   created_at: string;
   category: string | null;
-  views: number;
   comment_count: number;
   is_anonymous: boolean;
 };
@@ -70,6 +69,7 @@ export default function RantCommentsScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
   const { session } = useSupabase();
+  const { colors } = useTheme();
   const [rant, setRant] = useState<RantDetail | null>(null);
   const [author, setAuthor] = useState<RantAuthor | null>(null);
   const [comments, setComments] = useState<RantComment[]>([]);
@@ -82,6 +82,9 @@ export default function RantCommentsScreen() {
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [likingCommentIds, setLikingCommentIds] = useState<
+    Record<string, boolean>
+  >({});
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -163,7 +166,7 @@ export default function RantCommentsScreen() {
       const { data: rantData, error: rantError } = await supabase
         .from("rants")
         .select(
-          "id, user_id, content, created_at, category, views, comment_count, is_anonymous",
+          "id, user_id, content, created_at, category, comment_count, is_anonymous",
         )
         .eq("id", id)
         .maybeSingle();
@@ -272,18 +275,6 @@ export default function RantCommentsScreen() {
 
     loadCached();
     loadRant();
-
-    const incrementViews = async () => {
-      if (!id) return;
-      const { data, error } = await supabase.rpc("increment_rant_views", {
-        p_rant_id: id,
-      });
-      if (!error && isMounted && typeof data === "number") {
-        setRant((prev) => (prev ? { ...prev, views: data } : prev));
-      }
-    };
-
-    incrementViews();
 
     return () => {
       isMounted = false;
@@ -436,21 +427,30 @@ export default function RantCommentsScreen() {
   };
 
   const handleToggleLike = async (commentId: string) => {
-    if (!session?.user?.id) {
+    if (likingCommentIds[commentId]) return;
+
+    const currentUserId =
+      session?.user?.id ?? (await supabase.auth.getUser()).data.user?.id;
+    if (!currentUserId) {
       setErrorMessage("Please log in to like comments.");
       return;
     }
 
-    let previousLiked = false;
-    let previousLikes = 0;
-    let nextLiked = false;
+    const targetComment = comments.find((comment) => comment.id === commentId);
+    if (!targetComment) return;
+
+    const previousLiked = targetComment.is_liked ?? false;
+    const previousLikes = targetComment.likes;
+    const nextLiked = !previousLiked;
+
+    setLikingCommentIds((prev) => ({
+      ...prev,
+      [commentId]: true,
+    }));
 
     setComments((prev) =>
       prev.map((comment) => {
         if (comment.id !== commentId) return comment;
-        previousLiked = comment.is_liked ?? false;
-        previousLikes = comment.likes;
-        nextLiked = !previousLiked;
 
         return {
           ...comment,
@@ -478,6 +478,10 @@ export default function RantCommentsScreen() {
             : comment,
         ),
       );
+      setLikingCommentIds((prev) => ({
+        ...prev,
+        [commentId]: false,
+      }));
       return;
     }
 
@@ -488,6 +492,11 @@ export default function RantCommentsScreen() {
         ),
       );
     }
+
+    setLikingCommentIds((prev) => ({
+      ...prev,
+      [commentId]: false,
+    }));
   };
 
   const toggleReplies = (commentId: string) => {
@@ -589,6 +598,7 @@ export default function RantCommentsScreen() {
             <View className="flex-row items-center gap-3 mt-2.5">
               <Pressable
                 onPress={() => handleToggleLike(comment.id)}
+                disabled={Boolean(likingCommentIds[comment.id])}
                 className="flex-row items-center gap-1"
               >
                 <Ionicons
@@ -644,39 +654,28 @@ export default function RantCommentsScreen() {
         enabled={Platform.OS === "ios"}
       >
         <View className="flex-1 bg-white dark:bg-slate-950">
+          <View className="flex-row items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+            <Pressable
+              onPress={() => router.back()}
+              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
+            >
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
+            </Pressable>
+            <AppText
+              numberOfLines={1}
+              className="mx-3 flex-1 text-center text-lg font-semibold text-slate-900 dark:text-slate-100"
+            >
+              Comments
+            </AppText>
+            <View className="h-9 w-9" />
+          </View>
+
           <ScrollView
             className="flex-1"
             contentContainerClassName="px-[18px] py-4 pb-28"
             contentContainerStyle={{ flexGrow: 1 }}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Header */}
-            <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-              <Pressable
-                onPress={() => router.back()}
-                className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-              >
-                <Feather name="arrow-left" size={24} color="black" />
-              </Pressable>
-
-              <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Comments
-              </AppText>
-              <View className="w-14" />
-            </View>
-            {/* <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-            <Pressable
-              onPress={() => router.back()}
-              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-            >
-              <Feather name="arrow-left" size={24} color="black" />
-            </Pressable>
-
-            <AppText className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Comments
-            </AppText>
-            <View className="w-14" />
-          </View> */}
             {/* Rant Card */}
             <View className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4">
               {isLoading && !rant ? (
@@ -743,10 +742,6 @@ export default function RantCommentsScreen() {
                   <View className="h-1 w-1 rounded-full bg-slate-200 dark:bg-slate-800" />
                   <AppText className="text-xs text-green-600 dark:text-green-400">
                     {rant.category ?? "General"}
-                  </AppText>
-                  <View className="h-1 w-1 rounded-full bg-slate-200 dark:bg-slate-800" />
-                  <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                    {rant.views} views
                   </AppText>
                 </View>
               ) : null}

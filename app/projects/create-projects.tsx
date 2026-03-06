@@ -137,7 +137,7 @@ export default function CreateProjectsScreen() {
           message={toast.message}
           variant={toast.variant}
         />
-        <StatusBar style={statusBarStyle} />
+        <StatusBar style={statusBarStyle} translucent={false} />
         <View className="flex-row items-center justify-between px-5 pb-3 pt-6">
           <TouchableOpacity
             className="h-10 w-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20"

@@ -37,7 +37,7 @@ export default function SplashScreen() {
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
       <View className="flex-1 items-center justify-center bg-slate-50 px-6 dark:bg-slate-950">
-        <StatusBar style={statusBarStyle} />
+        <StatusBar style={statusBarStyle} translucent={false} />
         <View className="items-center">
           <View className="h-20 w-20 items-center justify-center rounded-3xl bg-white shadow-lg dark:bg-slate-900">
             <View className="h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 dark:bg-emerald-500/20">

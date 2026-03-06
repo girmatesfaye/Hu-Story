@@ -9,6 +9,8 @@ alter table public.rant_comments enable row level security;
 alter table public.rant_comment_likes enable row level security;
 alter table public.events enable row level security;
 alter table public.event_attendees enable row level security;
+alter table public.event_likes enable row level security;
+alter table public.event_views enable row level security;
 alter table public.spots enable row level security;
 alter table public.spot_images enable row level security;
 alter table public.spot_reviews enable row level security;
@@ -195,6 +197,33 @@ create policy "event_attendees_owner_delete"
   on public.event_attendees
   for delete
   using (auth.uid() = user_id);
+
+-- Event likes
+create policy "event_likes_owner_read"
+  on public.event_likes
+  for select
+  using (auth.uid() = user_id);
+
+create policy "event_likes_owner_insert"
+  on public.event_likes
+  for insert
+  with check (auth.uid() = user_id);
+
+create policy "event_likes_owner_delete"
+  on public.event_likes
+  for delete
+  using (auth.uid() = user_id);
+
+-- Event views
+create policy "event_views_owner_read"
+  on public.event_views
+  for select
+  using (auth.uid() = user_id);
+
+create policy "event_views_owner_insert"
+  on public.event_views
+  for insert
+  with check (auth.uid() = user_id);
 
 -- Spots
 create policy "spots_public_read"
