@@ -16,6 +16,8 @@ const lightColors = {
   chipInactiveBg: "#F1F5F9",
   chipInactiveText: "#475569",
   chipActiveText: "#FFFFFF",
+  danger: "#DC2626",
+  warning: "#F59E0B",
   overlay: "rgba(0, 0, 0, 0.4)",
 };
 
@@ -35,6 +37,8 @@ const darkColors = {
   chipInactiveBg: "#111827",
   chipInactiveText: "#CBD5F5",
   chipActiveText: "#0B0B0B",
+  danger: "#F87171",
+  warning: "#FBBF24",
   overlay: "rgba(0, 0, 0, 0.65)",
 };
 

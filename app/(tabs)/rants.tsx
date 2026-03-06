@@ -6,7 +6,6 @@ import {
   Pressable,
   Image,
   ViewToken,
-  useColorScheme,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "../../components/AppText";
@@ -19,6 +18,9 @@ import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import { RANT_FILTER_CHIPS } from "../../constants/categories";
+import { useTheme } from "../../hooks/useTheme";
+import { TabHeader } from "../../components/TabHeader";
+import { formatTimeAgo } from "../../lib/ui/formatters";
 
 type RantItem = {
   id: string;
@@ -41,20 +43,6 @@ type RantItem = {
 
 const fallbackAvatar =
   "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=80&q=80";
-
-const formatTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-};
 
 function RantCardSkeleton() {
   return (
@@ -85,6 +73,7 @@ function RantCardSkeleton() {
 export default function RantsScreen() {
   const PAGE_SIZE = 15;
   const router = useRouter();
+  const { colors } = useTheme();
   const { session } = useSupabase();
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
@@ -101,14 +90,6 @@ export default function RantsScreen() {
   const nextPageRef = useRef(0);
   const hasMoreRef = useRef(true);
   const isFetchingRef = useRef(false);
-  const scheme = useColorScheme();
-  const iconColors = {
-    text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
-    muted: scheme === "dark" ? "#94A3B8" : "#64748B",
-    accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
-    danger: scheme === "dark" ? "#F87171" : "#DC2626",
-    chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
-  };
 
   const loadRants = useCallback(
     async (reset = false) => {
@@ -388,30 +369,15 @@ export default function RantsScreen() {
     <SafeAreaView edges={["top"]} className="flex-1 bg-white dark:bg-slate-950">
       {isLoading ? (
         <ScrollView contentContainerClassName="px-5 pt-5 pb-20">
-          <View className="flex-row items-center justify-between mb-4">
-            <View>
-              <AppText
-                className="text-[22px] font-bold text-slate-900 dark:text-slate-100"
-                style={{ fontFamily: "LexendRegular" }}
-              >
-                HU Rants
-              </AppText>
-              <AppText className="text-xs mt-[2px] text-slate-500  dark:text-green-400">
-                Hawassa University Anonymous Feed.
-              </AppText>
-            </View>
+          <TabHeader
+            title="HU Rants"
+            subtitle="Hawassa University Anonymous Feed."
+            onPressNotification={() =>
+              router.push("/notifications/notification")
+            }
+          />
 
-            <Pressable
-              onPress={() => router.push("../notifications/notification")}
-              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color={iconColors.text}
-              />
-            </Pressable>
-          </View>
+          <View className="h-4" />
 
           <ScrollView
             horizontal
@@ -474,30 +440,15 @@ export default function RantsScreen() {
           }}
           ListHeaderComponent={
             <>
-              <View className="flex-row items-center justify-between mb-4">
-                <View>
-                  <AppText
-                    className="text-[22px] font-bold text-slate-900 dark:text-slate-100"
-                    style={{ fontFamily: "LexendRegular" }}
-                  >
-                    HU Rants
-                  </AppText>
-                  <AppText className="text-xs mt-[2px] text-slate-500  dark:text-green-400">
-                    Hawassa University Anonymous Feed
-                  </AppText>
-                </View>
+              <TabHeader
+                title="HU Rants"
+                subtitle="Hawassa University Anonymous Feed"
+                onPressNotification={() =>
+                  router.push("/notifications/notification")
+                }
+              />
 
-                <Pressable
-                  onPress={() => router.push("../notifications/notification")}
-                  className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-                >
-                  <Ionicons
-                    name="notifications-outline"
-                    size={22}
-                    color={iconColors.text}
-                  />
-                </Pressable>
-              </View>
+              <View className="h-4" />
 
               <ScrollView
                 horizontal
@@ -579,7 +530,7 @@ export default function RantsScreen() {
                   <Ionicons
                     name="ellipsis-horizontal"
                     size={20}
-                    color={iconColors.muted}
+                    color={colors.mutedText}
                   />
                 </Pressable>
               </View>
@@ -600,9 +551,7 @@ export default function RantsScreen() {
                       name="arrow-up"
                       size={18}
                       color={
-                        rant.user_vote === 1
-                          ? iconColors.accent
-                          : iconColors.muted
+                        rant.user_vote === 1 ? colors.accent : colors.mutedText
                       }
                     />
                     <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
@@ -617,9 +566,7 @@ export default function RantsScreen() {
                       name="arrow-down"
                       size={18}
                       color={
-                        rant.user_vote === -1
-                          ? iconColors.danger
-                          : iconColors.muted
+                        rant.user_vote === -1 ? colors.danger : colors.mutedText
                       }
                     />
                     <AppText className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
@@ -633,7 +580,7 @@ export default function RantsScreen() {
                     <Ionicons
                       name="eye-outline"
                       size={15}
-                      color={iconColors.muted}
+                      color={colors.mutedText}
                     />
                     <AppText className="text-xs text-slate-500 dark:text-slate-400">
                       {rant.views}
@@ -647,7 +594,7 @@ export default function RantsScreen() {
                     <Ionicons
                       name="chatbox-outline"
                       size={16}
-                      color={iconColors.muted}
+                      color={colors.mutedText}
                     />
                     <AppText className="text-xs text-slate-500 dark:text-slate-400">
                       {rant.comment_count} Comments
@@ -686,7 +633,7 @@ export default function RantsScreen() {
         onPress={() => router.push("/rants/create-rants")}
         className="absolute right-6 bottom-6 w-14 h-14 rounded-full items-center justify-center bg-green-600 dark:bg-green-400 shadow-lg"
       >
-        <Ionicons name="add" size={26} color={iconColors.chipText} />
+        <Ionicons name="add" size={26} color={colors.chipActiveText} />
       </Pressable>
       <ReportModal
         visible={isReportOpen}

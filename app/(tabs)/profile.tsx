@@ -13,6 +13,7 @@ import { useSupabase } from "../../providers/SupabaseProvider";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { formatTimeAgo } from "../../lib/ui/formatters";
 
 type Profile = {
   full_name: string | null;
@@ -82,20 +83,6 @@ const fallbackProjectImage =
 const fallbackEventImage =
   "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=400&q=80";
 
-const formatTimeAgo = (dateString: string) => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-};
-
 export default function ProfileTabScreen() {
   const { colors, statusBarStyle } = useTheme();
   const { session } = useSupabase();
@@ -143,17 +130,36 @@ export default function ProfileTabScreen() {
     if (!data) {
       const fallbackCampus =
         session.user.user_metadata?.campus ?? "Hawassa University";
-      await supabase
+      const { error: insertError } = await supabase
         .from("profiles")
         .insert({ user_id: session.user.id, campus: fallbackCampus });
-      const { data: freshProfile } = await supabase
+
+      if (insertError) {
+        setProfile(null);
+        setFetchError(
+          `Couldn't create your profile yet. Please retry. ${insertError.message}`,
+        );
+        return;
+      }
+
+      const { data: freshProfile, error: freshError } = await supabase
         .from("profiles")
         .select("full_name, username, campus, avatar_url, bio")
         .eq("user_id", session.user.id)
         .maybeSingle();
 
+      if (freshError) {
+        setProfile(null);
+        setFetchError(
+          `Profile created but failed to load. Please retry. ${freshError.message}`,
+        );
+        return;
+      }
+
       if (!freshProfile) {
-        setFetchError("Unable to load your profile.");
+        setFetchError(
+          "Unable to load your profile after creation. Please retry.",
+        );
       }
 
       setProfile(freshProfile ?? null);
@@ -241,7 +247,7 @@ export default function ProfileTabScreen() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        setFetchError(error.message);
+        setListError(error.message);
         setSpots([]);
       } else {
         setSpots((data ?? []) as SpotItem[]);
@@ -256,7 +262,7 @@ export default function ProfileTabScreen() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        setFetchError(error.message);
+        setListError(error.message);
         setRants([]);
       } else {
         setRants((data ?? []) as RantItem[]);
@@ -271,7 +277,7 @@ export default function ProfileTabScreen() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        setFetchError(error.message);
+        setListError(error.message);
         setProjects([]);
       } else {
         setProjects((data ?? []) as ProjectItem[]);
@@ -286,7 +292,7 @@ export default function ProfileTabScreen() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        setFetchError(error.message);
+        setListError(error.message);
         setEvents([]);
       } else {
         setEvents((data ?? []) as EventItem[]);
@@ -302,19 +308,45 @@ export default function ProfileTabScreen() {
 
   const handleRetryData = useCallback(async () => {
     setFetchError(null);
+    setListError(null);
     await Promise.all([loadProfile(), loadStats(), loadSection()]);
   }, [loadProfile, loadSection, loadStats]);
+
+  const handleRetrySection = useCallback(async () => {
+    setListError(null);
+    await loadSection();
+  }, [loadSection]);
 
   const handleDelete = async () => {
     if (!deleteTarget || !session?.user) return;
 
     setIsDeleting(true);
 
-    const { error } = await supabase
-      .from(deleteTarget.type)
-      .delete()
-      .eq("id", deleteTarget.id)
-      .eq("user_id", session.user.id);
+    let error: { message: string } | null = null;
+
+    if (deleteTarget.type === "spots") {
+      const { error: rpcError } = await supabase.rpc("delete_my_spot", {
+        p_spot_id: deleteTarget.id,
+      });
+      error = rpcError;
+    } else if (deleteTarget.type === "events") {
+      const { error: rpcError } = await supabase.rpc("delete_my_event", {
+        p_event_id: deleteTarget.id,
+      });
+      error = rpcError;
+    } else if (deleteTarget.type === "projects") {
+      const { error: rpcError } = await supabase.rpc("delete_my_project", {
+        p_project_id: deleteTarget.id,
+      });
+      error = rpcError;
+    } else {
+      const { error: deleteError } = await supabase
+        .from(deleteTarget.type)
+        .delete()
+        .eq("id", deleteTarget.id)
+        .eq("user_id", session.user.id);
+      error = deleteError;
+    }
 
     if (error) {
       setListError(error.message);
@@ -340,6 +372,7 @@ export default function ProfileTabScreen() {
       [deleteTarget.type]: Math.max(prev[deleteTarget.type] - 1, 0),
     }));
 
+    setListError(null);
     setIsDeleting(false);
     setDeleteTarget(null);
   };
@@ -445,11 +478,7 @@ export default function ProfileTabScreen() {
             accessibilityRole="button"
             onPress={() => router.push("/profiles/settings")}
           >
-            <Ionicons
-              name="settings-outline"
-              size={20}
-              color={statusBarStyle === "light" ? "#E5E7EB" : "#0F172A"}
-            />
+            <Ionicons name="settings-outline" size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -471,7 +500,7 @@ export default function ProfileTabScreen() {
               accessibilityRole="button"
               onPress={() => router.push("/profiles/edit-profile")}
             >
-              <Ionicons name="pencil" size={16} color="#FFFFFF" />
+              <Ionicons name="pencil" size={16} color={colors.chipActiveText} />
             </TouchableOpacity>
           </View>
 
@@ -633,6 +662,26 @@ export default function ProfileTabScreen() {
         </View>
 
         <View className="mt-6 gap-4">
+          {listError ? (
+            <View className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-900/20">
+              <AppText className="text-sm font-semibold text-red-600 dark:text-red-300">
+                Couldn&apos;t load this section
+              </AppText>
+              <AppText className="mt-1 text-xs text-red-500 dark:text-red-300">
+                {listError}
+              </AppText>
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() => void handleRetrySection()}
+                className="mt-3 self-start rounded-lg bg-red-600 px-3 py-2"
+              >
+                <AppText className="text-xs font-semibold text-white">
+                  Retry Section
+                </AppText>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           {isLoadingList && activeSection === "spots"
             ? Array.from({ length: 3 }).map((_, index) => (
                 <View

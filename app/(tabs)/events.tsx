@@ -20,8 +20,8 @@ import { useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
+import { TabHeader } from "../../components/TabHeader";
 import { useTheme } from "../../hooks/useTheme";
-import { useColorScheme } from "react-native";
 import { supabase } from "../../lib/supabase";
 import { formatEventDateRange } from "../../lib/eventDateTime";
 
@@ -230,7 +230,6 @@ export default function EventTabScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const iconColor = colors.mutedStrong;
-  const scheme = useColorScheme();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -248,13 +247,6 @@ export default function EventTabScreen() {
   const nextPageRef = useRef(0);
   const hasMoreRef = useRef(true);
   const isFetchingRef = useRef(false);
-
-  const iconColors = {
-    text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
-    muted: scheme === "dark" ? "#94A3B8" : "#64748B",
-    accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
-    chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
-  };
 
   const loadEvents = useCallback(async (reset = false) => {
     if (isFetchingRef.current) return;
@@ -476,26 +468,13 @@ export default function EventTabScreen() {
     >
       {isLoading ? (
         <ScrollView contentContainerClassName="px-5 pb-28 pt-4">
-          <View className="flex-row items-center justify-between">
-            <View>
-              <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
-                Upcoming Events
-              </AppText>
-              <AppText className="text-sm text-slate-500  dark:text-green-400">
-                Discover what's happening around campus.
-              </AppText>
-            </View>
-            <Pressable
-              onPress={() => router.push("../notifications/notification")}
-              className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color={iconColors.text}
-              />
-            </Pressable>
-          </View>
+          <TabHeader
+            title="Upcoming Events"
+            subtitle="Discover what's happening around campus."
+            onPressNotification={() =>
+              router.push("/notifications/notification")
+            }
+          />
 
           <View className="mt-4 flex-row items-center gap-3">
             <View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
@@ -624,26 +603,13 @@ export default function EventTabScreen() {
           }}
           ListHeaderComponent={
             <>
-              <View className="flex-row items-center justify-between">
-                <View>
-                  <AppText className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                    Upcoming Events
-                  </AppText>
-                  <AppText className="text-sm text-slate-500  dark:text-green-400">
-                    Discover what's happening around campus
-                  </AppText>
-                </View>
-                <Pressable
-                  onPress={() => router.push("../notifications/notification")}
-                  className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 items-center justify-center"
-                >
-                  <Ionicons
-                    name="notifications-outline"
-                    size={22}
-                    color={iconColors.text}
-                  />
-                </Pressable>
-              </View>
+              <TabHeader
+                title="Upcoming Events"
+                subtitle="Discover what's happening around campus"
+                onPressNotification={() =>
+                  router.push("/notifications/notification")
+                }
+              />
 
               <View className="mt-4 flex-row items-center gap-3">
                 <View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
