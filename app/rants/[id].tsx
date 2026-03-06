@@ -31,6 +31,7 @@ type RantDetail = {
   created_at: string;
   category: string | null;
   comment_count: number;
+  views: number;
   is_anonymous: boolean;
 };
 
@@ -166,7 +167,7 @@ export default function RantCommentsScreen() {
       const { data: rantData, error: rantError } = await supabase
         .from("rants")
         .select(
-          "id, user_id, content, created_at, category, comment_count, is_anonymous",
+          "id, user_id, content, created_at, category, comment_count, views, is_anonymous",
         )
         .eq("id", id)
         .maybeSingle();
@@ -299,9 +300,11 @@ export default function RantCommentsScreen() {
 
           if (eventType === "INSERT") {
             const newRow = payload.new as RantComment;
+            let didInsert = false;
 
             setComments((prev) => {
               if (prev.some((comment) => comment.id === newRow.id)) return prev;
+              didInsert = true;
               return [...prev, { ...newRow, is_liked: false }];
             });
 
@@ -335,14 +338,16 @@ export default function RantCommentsScreen() {
                 [newRow.parent_comment_id as string]: true,
               }));
             }
-            setRant((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    comment_count: (prev.comment_count ?? 0) + 1,
-                  }
-                : prev,
-            );
+            if (didInsert) {
+              setRant((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      comment_count: (prev.comment_count ?? 0) + 1,
+                    }
+                  : prev,
+              );
+            }
           }
 
           if (eventType === "UPDATE") {
@@ -358,17 +363,21 @@ export default function RantCommentsScreen() {
 
           if (eventType === "DELETE") {
             const oldRow = payload.old as RantComment;
-            setComments((prev) =>
-              prev.filter((comment) => comment.id !== oldRow.id),
-            );
-            setRant((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    comment_count: Math.max((prev.comment_count ?? 1) - 1, 0),
-                  }
-                : prev,
-            );
+            let didRemove = false;
+            setComments((prev) => {
+              didRemove = prev.some((comment) => comment.id === oldRow.id);
+              return prev.filter((comment) => comment.id !== oldRow.id);
+            });
+            if (didRemove) {
+              setRant((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      comment_count: Math.max((prev.comment_count ?? 1) - 1, 0),
+                    }
+                  : prev,
+              );
+            }
           }
         },
       )
@@ -376,6 +385,28 @@ export default function RantCommentsScreen() {
 
     return () => {
       supabase.removeChannel(channel);
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    let isMounted = true;
+
+    const incrementViews = async () => {
+      const { data, error } = await supabase.rpc("increment_rant_views", {
+        p_rant_id: id,
+      });
+
+      if (!error && isMounted && typeof data === "number") {
+        setRant((prev) => (prev ? { ...prev, views: data } : prev));
+      }
+    };
+
+    void incrementViews();
+
+    return () => {
+      isMounted = false;
     };
   }, [id]);
 
@@ -421,9 +452,6 @@ export default function RantCommentsScreen() {
     }
     setReplyToId(null);
     setIsAnonymousComment(false);
-    setRant((prev) =>
-      prev ? { ...prev, comment_count: (prev.comment_count ?? 0) + 1 } : prev,
-    );
   };
 
   const handleToggleLike = async (commentId: string) => {

@@ -23,6 +23,7 @@ type EventDetail = {
   tags: string[] | null;
   attendees_count: number;
   likes: number;
+  views: number;
   host_name: string | null;
 };
 
@@ -53,6 +54,16 @@ export default function EventDetailsScreen() {
   const [isLikeUpdating, setIsLikeUpdating] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
+  const isPastEvent = useMemo(() => {
+    const reference = event?.end_at ?? event?.start_at;
+    if (!reference) return false;
+
+    const date = new Date(reference);
+    if (Number.isNaN(date.getTime())) return false;
+
+    return date.getTime() < Date.now();
+  }, [event?.end_at, event?.start_at]);
+
   const loadEvent = useCallback(async () => {
     if (!id) return;
 
@@ -63,7 +74,7 @@ export default function EventDetailsScreen() {
     const { data, error } = await supabase
       .from("events")
       .select(
-        "id, title, description, start_at, end_at, location, address, cover_url, tags, attendees_count, likes, host_name",
+        "id, title, description, start_at, end_at, location, address, cover_url, tags, attendees_count, likes, views, host_name",
       )
       .eq("id", id)
       .maybeSingle();
@@ -129,8 +140,35 @@ export default function EventDetailsScreen() {
     void loadInteractionStatus();
   }, [loadEvent, loadInteractionStatus]);
 
+  useEffect(() => {
+    if (!id) return;
+
+    let isMounted = true;
+
+    const incrementViews = async () => {
+      const { data, error } = await supabase.rpc("increment_event_views", {
+        p_event_id: id,
+      });
+
+      if (!error && isMounted && typeof data === "number") {
+        setEvent((prev) => (prev ? { ...prev, views: data } : prev));
+      }
+    };
+
+    void incrementViews();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
+
   const handleGoing = async () => {
     if (!event || isUpdating || isGoing) return;
+
+    if (isPastEvent) {
+      setErrorMessage("This event has already passed.");
+      return;
+    }
 
     setIsUpdating(true);
     setErrorMessage(null);
@@ -165,6 +203,11 @@ export default function EventDetailsScreen() {
   const handleCancelGoing = async () => {
     if (!event || isUpdating || !isGoing) return;
 
+    if (isPastEvent) {
+      setErrorMessage("This event has already passed.");
+      return;
+    }
+
     setIsUpdating(true);
     setErrorMessage(null);
 
@@ -197,6 +240,11 @@ export default function EventDetailsScreen() {
 
   const handleToggleLike = async () => {
     if (!event || isLikeUpdating) return;
+
+    if (isPastEvent) {
+      setErrorMessage("This event has already passed.");
+      return;
+    }
 
     if (!userId) {
       setErrorMessage("Sign in to like events.");
@@ -438,24 +486,28 @@ export default function EventDetailsScreen() {
         <View className="absolute bottom-0 left-0 right-0 flex-row items-center gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-950">
           <Pressable
             onPress={isGoing ? handleCancelGoing : handleGoing}
-            disabled={isUpdating}
+            disabled={isUpdating || isPastEvent}
             className={`flex-1 items-center justify-center rounded-xl py-3 ${
               isGoing ? "bg-slate-200 dark:bg-slate-800" : "bg-green-600"
-            } ${isUpdating ? "opacity-60" : ""}`}
+            } ${isUpdating || isPastEvent ? "opacity-60" : ""}`}
           >
             <AppText
               className={`text-sm font-semibold ${
                 isGoing ? "text-slate-900 dark:text-slate-100" : "text-white"
               }`}
             >
-              {isGoing ? "Cancel Going" : "I'm Going"}
+              {isPastEvent
+                ? "Event Passed"
+                : isGoing
+                  ? "Cancel Going"
+                  : "I'm Going"}
             </AppText>
           </Pressable>
           <Pressable
             onPress={handleToggleLike}
-            disabled={isLikeUpdating}
+            disabled={isLikeUpdating || isPastEvent}
             className={`h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 ${
-              isLikeUpdating ? "opacity-60" : ""
+              isLikeUpdating || isPastEvent ? "opacity-60" : ""
             }`}
           >
             <Ionicons

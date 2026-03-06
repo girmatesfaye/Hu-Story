@@ -24,19 +24,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { useColorScheme } from "react-native";
 import { supabase } from "../../lib/supabase";
 import AntDesign from "@expo/vector-icons/build/AntDesign";
-
-const categories = [
-  "All",
-  "Food",
-  "Hangout",
-  "Game",
-  "Study",
-  "Date Spots",
-  "Quiet Areas",
-  "Outdoor",
-  "Cheap Eats",
-  "Other",
-];
+import { SPOT_FILTER_CATEGORIES } from "../../constants/categories";
 
 type SpotItem = {
   id: string;
@@ -52,18 +40,13 @@ type SpotItem = {
 const fallbackSpotImage =
   "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800&q=80";
 
-const tagToneStyles: Record<string, { container: string; text: string }> = {
-  blue: { container: "bg-blue-100", text: "text-blue-700" },
-  orange: { container: "bg-orange-100", text: "text-orange-700" },
-  purple: { container: "bg-purple-100", text: "text-purple-700" },
-  red: { container: "bg-red-100", text: "text-red-700" },
-};
-
 export default function SpotsTabScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const scheme = useColorScheme();
-  const [activeCategory, setActiveCategory] = useState(categories[0]);
+  const [activeCategory, setActiveCategory] = useState<string>(
+    SPOT_FILTER_CATEGORIES[0],
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [spots, setSpots] = useState<SpotItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -196,7 +179,7 @@ export default function SpotsTabScreen() {
               <AppText className="text-[22px] font-bold text-slate-900 dark:text-slate-100">
                 Campus Spots
               </AppText>
-              <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">
+              <AppText className="mt-1 text-sm font-semibold text-slate-500 tracking-wider dark:text-green-400">
                 Find and share the best places around campus.
               </AppText>
             </View>
@@ -232,7 +215,7 @@ export default function SpotsTabScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerClassName="mt-4 gap-3"
           >
-            {categories.map((category) => {
+            {SPOT_FILTER_CATEGORIES.map((category) => {
               const isActive = category === activeCategory;
               return (
                 <Pressable
@@ -300,7 +283,7 @@ export default function SpotsTabScreen() {
                   <AppText className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
                     Campus Spots
                   </AppText>
-                  <AppText className="mt-1 text-sm font-semibold text-slate-500 stracking-wider dark:text-green-400">
+                  <AppText className="mt-1 text-sm font-semibold text-slate-500 tracking-wider dark:text-green-400">
                     Find and share the best places around campus.
                   </AppText>
                 </View>
@@ -336,7 +319,7 @@ export default function SpotsTabScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerClassName="mt-4 gap-3"
               >
-                {categories.map((category) => {
+                {SPOT_FILTER_CATEGORIES.map((category) => {
                   const isActive = category === activeCategory;
                   return (
                     <Pressable

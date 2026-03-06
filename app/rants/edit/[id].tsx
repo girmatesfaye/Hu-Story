@@ -9,8 +9,7 @@ import { SkeletonBlock } from "../../../components/SkeletonBlock";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../../lib/supabase";
 import { useSupabase } from "../../../providers/SupabaseProvider";
-
-const categories = ["Campus Life", "Cafeteria", "Academics", "Dorms", "Spots"];
+import { RANT_CATEGORIES } from "../../../constants/categories";
 
 type RantRow = {
   id: string;
@@ -23,7 +22,7 @@ export default function EditRantScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { session } = useSupabase();
-  const [activeCategory, setActiveCategory] = useState(categories[0]);
+  const [activeCategory, setActiveCategory] = useState(RANT_CATEGORIES[0]);
   const [text, setText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -57,7 +56,7 @@ export default function EditRantScreen() {
         if (session?.user?.id && rant.user_id !== session.user.id) {
           setFetchError("You do not have permission to edit this rant.");
         }
-        setActiveCategory(rant.category ?? categories[0]);
+        setActiveCategory(rant.category ?? RANT_CATEGORIES[0]);
         setText(rant.content ?? "");
       }
 
@@ -146,7 +145,7 @@ export default function EditRantScreen() {
             </AppText>
 
             <View className="flex-row flex-wrap gap-3 mt-3">
-              {categories.map((category) => {
+              {RANT_CATEGORIES.map((category) => {
                 const active = category === activeCategory;
                 return (
                   <Pressable

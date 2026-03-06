@@ -18,23 +18,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTopToast } from "../../hooks/useTopToast";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
-const categories = [
-  "Campus Life",
-  "Cafeteria",
-  "Academics",
-  "Dorms",
-  "Relationships",
-  "Sexual",
-  "Mental",
-  "Family",
-  "Other",
-];
 import { useTheme } from "../../hooks/useTheme";
+import { RANT_CATEGORIES } from "../../constants/categories";
 export default function CreateRantScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { session } = useSupabase();
-  const [activeCategory, setActiveCategory] = useState(categories[0]);
+  const [activeCategory, setActiveCategory] = useState<string>(
+    RANT_CATEGORIES[0],
+  );
   const [text, setText] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,7 +125,7 @@ export default function CreateRantScreen() {
           </AppText>
 
           <View className="flex-row flex-wrap gap-3 mt-3">
-            {categories.map((category) => {
+            {RANT_CATEGORIES.map((category) => {
               const active = category === activeCategory;
               return (
                 <Pressable

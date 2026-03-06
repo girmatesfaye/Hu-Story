@@ -16,8 +16,7 @@ import { SkeletonBlock } from "../../../components/SkeletonBlock";
 import { useTheme } from "../../../hooks/useTheme";
 import { supabase } from "../../../lib/supabase";
 import { useSupabase } from "../../../providers/SupabaseProvider";
-
-const categories = ["Cafe", "Library", "Hangout", "Study", "Food", "Other"];
+import { SPOT_CATEGORIES } from "../../../constants/categories";
 
 type SpotRow = {
   id: string;
@@ -44,7 +43,9 @@ export default function EditSpotScreen() {
 
   const [feeType, setFeeType] = useState<"free" | "paid">("free");
   const [name, setName] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(categories[0]);
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    SPOT_CATEGORIES[0],
+  );
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -82,7 +83,11 @@ export default function EditSpotScreen() {
           setFetchError("You do not have permission to edit this spot.");
         }
         setName(spot.name ?? "");
-        setSelectedCategory(spot.category ?? categories[0]);
+        setSelectedCategory(
+          spot.category && SPOT_CATEGORIES.includes(spot.category as never)
+            ? spot.category
+            : SPOT_CATEGORIES[0],
+        );
         setLocation(spot.location ?? "");
         setDescription(spot.description ?? "");
         setFeeType((spot.price_type ?? "free") === "paid" ? "paid" : "free");
@@ -196,7 +201,7 @@ export default function EditSpotScreen() {
                 Category
               </AppText>
               <View className="mt-3 flex-row flex-wrap gap-2">
-                {categories.map((option) => (
+                {SPOT_CATEGORIES.map((option) => (
                   <Pressable
                     key={option}
                     onPress={() => setSelectedCategory(option)}
