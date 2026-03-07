@@ -21,7 +21,12 @@ const getProjectId = () => {
   );
 };
 
+const isExpoGo = () =>
+  Constants.appOwnership === "expo" ||
+  Constants.executionEnvironment === "storeClient";
+
 export async function registerForPushNotificationsAsync() {
+  if (isExpoGo()) return null;
   if (!Device.isDevice) return null;
 
   const existingPermissions = await Notifications.getPermissionsAsync();
