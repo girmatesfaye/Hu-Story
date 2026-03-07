@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, TextInput, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Feather from "@expo/vector-icons/Feather";
@@ -15,6 +22,7 @@ const moderationTabs = [
   { id: "pending", label: "Pending" },
   { id: "history", label: "History" },
 ];
+const REPORTS_PAGE_SIZE = 12;
 
 type ReportRow = {
   id: string;
@@ -173,8 +181,14 @@ export default function AdminScreen() {
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [targets, setTargets] = useState<Record<string, ReportTarget>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(REPORTS_PAGE_SIZE);
+  const [confirmAction, setConfirmAction] = useState<{
+    report: ReportRow;
+    action: "warn" | "delete";
+  } | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -221,38 +235,70 @@ export default function AdminScreen() {
     );
   }, [reports, activeTab, searchValue]);
 
+  const paginatedReports = useMemo(
+    () => filteredReports.slice(0, visibleCount),
+    [filteredReports, visibleCount],
+  );
+
+  const hasMoreReports = paginatedReports.length < filteredReports.length;
+
   useEffect(() => {
-    let isMounted = true;
+    setVisibleCount(REPORTS_PAGE_SIZE);
+  }, [activeTab, searchValue, reports]);
 
-    const loadReports = async () => {
+  const loadReports = async (options?: { showLoader?: boolean }) => {
+    const showLoader = options?.showLoader ?? true;
+
+    if (showLoader) {
       setIsLoading(true);
-      setErrorMessage(null);
+    }
+    setErrorMessage(null);
 
-      const { data, error } = await supabase
-        .from("reports")
-        .select(
-          "id, reporter_id, target_type, target_id, reason, details, status, created_at",
-        )
-        .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("reports")
+      .select(
+        "id, reporter_id, target_type, target_id, reason, details, status, created_at",
+      )
+      .order("created_at", { ascending: false });
 
-      if (!isMounted) return;
+    if (error) {
+      setErrorMessage(error.message);
+      setReports([]);
+    } else {
+      setReports((data ?? []) as ReportRow[]);
+    }
 
-      if (error) {
-        setErrorMessage(error.message);
-        setReports([]);
-      } else {
-        setReports((data ?? []) as ReportRow[]);
-      }
-
+    if (showLoader) {
       setIsLoading(false);
-    };
+    }
+  };
 
-    loadReports();
+  useEffect(() => {
+    void loadReports({ showLoader: true });
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-reports-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reports" },
+        () => {
+          void loadReports({ showLoader: false });
+        },
+      )
+      .subscribe();
 
     return () => {
-      isMounted = false;
+      void supabase.removeChannel(channel);
     };
   }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadReports({ showLoader: false });
+    setIsRefreshing(false);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -372,7 +418,7 @@ export default function AdminScreen() {
     };
   }, [reports]);
 
-  const handleModerationAction = async (
+  const executeModerationAction = async (
     report: ReportRow,
     action: "keep" | "warn" | "delete",
   ) => {
@@ -439,6 +485,26 @@ export default function AdminScreen() {
     );
     setUpdatingId(null);
   };
+
+  const handleModerationAction = (
+    report: ReportRow,
+    action: "keep" | "warn" | "delete",
+  ) => {
+    if (action === "warn" || action === "delete") {
+      setConfirmAction({ report, action });
+      return;
+    }
+
+    void executeModerationAction(report, action);
+  };
+
+  const confirmActionLabel =
+    confirmAction?.action === "delete" ? "Delete content" : "Warn user";
+
+  const confirmActionMessage =
+    confirmAction?.action === "delete"
+      ? "This will remove the reported content and notify the user. Continue?"
+      : "This will mark the report as warned and notify the user. Continue?";
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -521,7 +587,16 @@ export default function AdminScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerClassName="gap-4 px-5 pb-28 pt-5">
+      <ScrollView
+        contentContainerClassName="gap-4 px-5 pb-28 pt-5"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.mutedText}
+          />
+        }
+      >
         {isLoading ? (
           <AppText className="text-sm text-slate-400 dark:text-slate-500">
             Loading reports...
@@ -530,7 +605,7 @@ export default function AdminScreen() {
         {errorMessage ? (
           <AppText className="text-sm text-red-500">{errorMessage}</AppText>
         ) : null}
-        {filteredReports.map((item) => (
+        {paginatedReports.map((item) => (
           <ModerationCard
             key={item.id}
             item={item}
@@ -540,12 +615,70 @@ export default function AdminScreen() {
             isUpdating={updatingId === item.id}
           />
         ))}
+        {hasMoreReports ? (
+          <Pressable
+            onPress={() =>
+              setVisibleCount((current) => current + REPORTS_PAGE_SIZE)
+            }
+            className="items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <AppText className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Load more
+            </AppText>
+          </Pressable>
+        ) : null}
         {!isLoading && filteredReports.length === 0 ? (
           <AppText className="text-sm text-slate-400 dark:text-slate-500">
             No reports found.
           </AppText>
         ) : null}
       </ScrollView>
+
+      <Modal
+        visible={Boolean(confirmAction)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmAction(null)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/40 px-6">
+          <View className="w-full max-w-md rounded-2xl bg-white p-5 dark:bg-slate-900">
+            <AppText className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              {confirmActionLabel}
+            </AppText>
+            <AppText className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              {confirmActionMessage}
+            </AppText>
+
+            <View className="mt-5 flex-row gap-3">
+              <Pressable
+                onPress={() => setConfirmAction(null)}
+                className="flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900"
+              >
+                <AppText className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Cancel
+                </AppText>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (!confirmAction) return;
+                  const { report, action } = confirmAction;
+                  setConfirmAction(null);
+                  void executeModerationAction(report, action);
+                }}
+                className={`flex-1 items-center justify-center rounded-xl px-3 py-2.5 ${
+                  confirmAction?.action === "delete"
+                    ? "bg-red-500"
+                    : "bg-amber-500"
+                }`}
+              >
+                <AppText className="text-sm font-semibold text-white">
+                  Confirm
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
