@@ -24,6 +24,8 @@ import { useTopToast } from "../../hooks/useTopToast";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
+
+// Current merge keeps image-cover upload and keyboard-aware form behavior for event create/edit.
 import * as ImagePicker from "expo-image-picker";
 import { formatEventDateRange } from "../../lib/eventDateTime";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
