@@ -138,7 +138,7 @@ export default function LoginScreen() {
 
               <TouchableOpacity
                 onPress={handleLogin}
-                className={`mt-8 h-12 items-center justify-center rounded-2xl bg-emerald-600 ${
+                className={`mt-8 h-12 items-center justify-center rounded-2xl bg-green-600 ${
                   isLoading ? "opacity-60" : ""
                 }`}
                 accessibilityRole="button"

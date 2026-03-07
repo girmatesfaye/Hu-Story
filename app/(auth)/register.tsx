@@ -199,7 +199,7 @@ export default function RegisterScreen() {
                 <View
                   className={`h-5 w-5 items-center justify-center rounded-md border ${
                     agreed
-                      ? "border-emerald-600 bg-emerald-600"
+                      ? "border-green-600 bg-green-600"
                       : "border-slate-300 dark:border-slate-700"
                   }`}
                 >
@@ -209,7 +209,7 @@ export default function RegisterScreen() {
                 </View>
                 <AppText className="flex-1 text-sm text-slate-500 dark:text-slate-400">
                   I agree to the
-                  <AppText className="text-emerald-600 dark:text-emerald-400">
+                  <AppText className="text-green-600 dark:text-green-400">
                     {" "}
                     campus rules{","}
                   </AppText>{" "}
@@ -223,14 +223,14 @@ export default function RegisterScreen() {
                 </AppText>
               ) : null}
               {successMessage ? (
-                <AppText className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">
+                <AppText className="mt-4 text-sm text-green-600 dark:text-green-400">
                   {successMessage}
                 </AppText>
               ) : null}
 
               {/* ---------- REGISTER BUTTON ---------- */}
               <TouchableOpacity
-                className={`mt-8 h-12 items-center justify-center rounded-2xl bg-emerald-600 ${
+                className={`mt-8 h-12 items-center justify-center rounded-2xl bg-green-600 ${
                   isLoading ? "opacity-60" : ""
                 }`}
                 accessibilityRole="button"
