@@ -9,6 +9,11 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { formatTimeAgo } from "../../lib/ui/formatters";
+import { useRouter } from "expo-router";
+import {
+  getRouteFromNotificationTarget,
+  syncAppBadgeCount,
+} from "../../lib/notifications";
 
 const filters = ["All", "Rants", "Events", "Projects"];
 
@@ -17,6 +22,9 @@ type NotificationItem = {
   title: string;
   body: string | null;
   type: string | null;
+  target_type: string | null;
+  target_id: string | null;
+  deep_link: string | null;
   is_read: boolean;
   created_at: string;
 };
@@ -37,6 +45,7 @@ const getNotificationTone = (type?: string | null) => {
 export default function NotificationScreen() {
   const { colors, statusBarStyle } = useTheme();
   const { session } = useSupabase();
+  const router = useRouter();
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,6 +67,10 @@ export default function NotificationScreen() {
     () => visibleNotifications.filter((item) => !item.is_read).length,
     [visibleNotifications],
   );
+
+  useEffect(() => {
+    void syncAppBadgeCount(unreadCount);
+  }, [unreadCount]);
 
   useEffect(() => {
     let isMounted = true;
@@ -88,7 +101,9 @@ export default function NotificationScreen() {
 
       let query = supabase
         .from("notifications")
-        .select("id, title, body, type, is_read, created_at")
+        .select(
+          "id, title, body, type, target_type, target_id, deep_link, is_read, created_at",
+        )
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
 
@@ -195,6 +210,36 @@ export default function NotificationScreen() {
     );
   };
 
+  const handleOpenNotification = async (item: NotificationItem) => {
+    if (!session?.user?.id) return;
+
+    if (!item.is_read) {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", item.id)
+        .eq("user_id", session.user.id);
+
+      if (!error) {
+        setNotifications((current) =>
+          current.map((row) =>
+            row.id === item.id ? { ...row, is_read: true } : row,
+          ),
+        );
+      }
+    }
+
+    const route = getRouteFromNotificationTarget({
+      target_type: item.target_type ?? item.type,
+      target_id: item.target_id,
+      deep_link: item.deep_link,
+    });
+
+    if (route) {
+      router.push(route as never);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
       <View className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -286,8 +331,10 @@ export default function NotificationScreen() {
                 const tone = getNotificationTone(item.type);
 
                 return (
-                  <View
+                  <TouchableOpacity
                     key={item.id}
+                    accessibilityRole="button"
+                    onPress={() => void handleOpenNotification(item)}
                     className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900"
                   >
                     <View className="flex-row items-start gap-4">
@@ -319,7 +366,7 @@ export default function NotificationScreen() {
                         </AppText>
                       </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
