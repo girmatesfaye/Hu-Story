@@ -20,6 +20,8 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+
+// Current merge keeps media picker + keyboard-aware form flow and an expanded spot category set.
 const categories = [
   "All",
   "Food",
