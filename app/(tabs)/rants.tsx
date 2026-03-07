@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
+  LayoutChangeEvent,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  RefreshControl,
   ScrollView,
   View,
   Pressable,
@@ -14,7 +18,6 @@ import { ReportModal } from "../../components/ReportModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import { RANT_FILTER_CHIPS } from "../../constants/categories";
@@ -80,28 +83,44 @@ export default function RantsScreen() {
   const [activeChip, setActiveChip] = useState<string>(RANT_FILTER_CHIPS[0]);
   const [rants, setRants] = useState<RantItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [highestSeenIndex, setHighestSeenIndex] = useState(-1);
   const [unreadCount, setUnreadCount] = useState(0);
   const flatListRef = useRef<FlatList<RantItem>>(null);
+  const chipScrollRef = useRef<ScrollView>(null);
   const rantsLengthRef = useRef(0);
+  const chipLayoutsRef = useRef<Record<string, { x: number; width: number }>>(
+    {},
+  );
+  const chipScrollXRef = useRef(0);
+  const chipViewportWidthRef = useRef(0);
   const nextPageRef = useRef(0);
   const hasMoreRef = useRef(true);
   const isFetchingRef = useRef(false);
 
   const loadRants = useCallback(
-    async (reset = false) => {
+    async (
+      reset = false,
+      options?: {
+        showInitialLoader?: boolean;
+      },
+    ) => {
       if (isFetchingRef.current) return;
       if (!reset && !hasMoreRef.current) return;
+
+      const showInitialLoader = options?.showInitialLoader ?? reset;
 
       isFetchingRef.current = true;
       if (reset) {
         nextPageRef.current = 0;
         hasMoreRef.current = true;
         setHasMore(true);
-        setIsLoading(true);
+        if (showInitialLoader) {
+          setIsLoading(true);
+        }
       } else {
         setIsLoadingMore(true);
       }
@@ -132,6 +151,25 @@ export default function RantsScreen() {
       } else {
         const rows = (data ?? []) as RantItem[];
         const rantIds = rows.map((rant) => rant.id);
+        let commentCountMap = new Map<string, number>();
+
+        if (rantIds.length > 0) {
+          const { data: commentRows } = await supabase
+            .from("rant_comments")
+            .select("rant_id")
+            .in("rant_id", rantIds);
+
+          commentCountMap = (commentRows ?? []).reduce<Map<string, number>>(
+            (acc, row) => {
+              const rantId = row.rant_id as string | null;
+              if (!rantId) return acc;
+              acc.set(rantId, (acc.get(rantId) ?? 0) + 1);
+              return acc;
+            },
+            new Map<string, number>(),
+          );
+        }
+
         const userIds = Array.from(
           new Set(
             rows
@@ -167,6 +205,8 @@ export default function RantsScreen() {
 
         const hydratedRows = rows.map((rant) => ({
           ...rant,
+          comment_count:
+            commentCountMap.get(rant.id) ?? rant.comment_count ?? 0,
           profile: rant.user_id ? profileMap.get(rant.user_id) : undefined,
           user_vote: voteMap.get(rant.id) ?? 0,
         }));
@@ -189,9 +229,9 @@ export default function RantsScreen() {
         setHasMore(nextHasMore);
       }
 
-      if (reset) {
+      if (reset && showInitialLoader) {
         setIsLoading(false);
-      } else {
+      } else if (!reset) {
         setIsLoadingMore(false);
       }
       isFetchingRef.current = false;
@@ -203,12 +243,11 @@ export default function RantsScreen() {
     void loadRants(true);
   }, [loadRants]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadRants(true);
-      return undefined;
-    }, [loadRants]),
-  );
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await loadRants(true, { showInitialLoader: false });
+    setIsRefreshing(false);
+  }, [loadRants]);
 
   useEffect(() => {
     rantsLengthRef.current = rants.length;
@@ -245,6 +284,113 @@ export default function RantsScreen() {
         return nextHighestSeenIndex;
       });
     },
+  );
+
+  const ensureChipVisible = useCallback((chip: string) => {
+    const layout = chipLayoutsRef.current[chip];
+    const viewportWidth = chipViewportWidthRef.current;
+    if (!layout || viewportWidth <= 0 || !chipScrollRef.current) return;
+
+    const currentOffset = chipScrollXRef.current;
+    const leftEdge = layout.x;
+    const rightEdge = layout.x + layout.width;
+    let targetOffset = currentOffset;
+
+    if (leftEdge < currentOffset) {
+      targetOffset = Math.max(leftEdge - 8, 0);
+    } else if (rightEdge > currentOffset + viewportWidth) {
+      targetOffset = Math.max(rightEdge - viewportWidth + 8, 0);
+    }
+
+    if (targetOffset !== currentOffset) {
+      chipScrollRef.current.scrollTo({ x: targetOffset, animated: true });
+    }
+  }, []);
+
+  const handleChipBarLayout = useCallback((event: LayoutChangeEvent) => {
+    chipViewportWidthRef.current = event.nativeEvent.layout.width;
+  }, []);
+
+  const handleChipBarScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      chipScrollXRef.current = event.nativeEvent.contentOffset.x;
+    },
+    [],
+  );
+
+  const handleChipLayout = useCallback(
+    (chip: string, event: LayoutChangeEvent) => {
+      chipLayoutsRef.current[chip] = {
+        x: event.nativeEvent.layout.x,
+        width: event.nativeEvent.layout.width,
+      };
+      if (chip === activeChip) {
+        ensureChipVisible(chip);
+      }
+    },
+    [activeChip, ensureChipVisible],
+  );
+
+  const handleChipPress = useCallback(
+    (chip: string) => {
+      if (chip === activeChip) return;
+      setActiveChip(chip);
+    },
+    [activeChip],
+  );
+
+  useEffect(() => {
+    const id = setTimeout(() => ensureChipVisible(activeChip), 0);
+    return () => clearTimeout(id);
+  }, [activeChip, ensureChipVisible]);
+
+  const renderFilterChips = useCallback(
+    () => (
+      <ScrollView
+        ref={chipScrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerClassName="gap-2 pb-1"
+        onLayout={handleChipBarLayout}
+        onScroll={handleChipBarScroll}
+        scrollEventThrottle={16}
+        contentOffset={{ x: chipScrollXRef.current, y: 0 }}
+      >
+        {RANT_FILTER_CHIPS.map((chip) => {
+          const active = chip === activeChip;
+          return (
+            <Pressable
+              key={chip}
+              className={`px-4 py-2 rounded-full border ${
+                active
+                  ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
+                  : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
+              }`}
+              accessibilityRole="button"
+              onPress={() => handleChipPress(chip)}
+              onLayout={(event) => handleChipLayout(chip, event)}
+            >
+              <AppText
+                className={`text-xs ${
+                  active
+                    ? "text-white dark:text-slate-950"
+                    : "text-slate-600 dark:text-slate-300"
+                }`}
+              >
+                {chip}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    ),
+    [
+      activeChip,
+      handleChipBarLayout,
+      handleChipBarScroll,
+      handleChipLayout,
+      handleChipPress,
+    ],
   );
 
   const handleJumpToFirstUnread = useCallback(() => {
@@ -378,38 +524,7 @@ export default function RantsScreen() {
           />
 
           <View className="h-4" />
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-2 pb-1"
-          >
-            {RANT_FILTER_CHIPS.map((chip) => {
-              const active = chip === activeChip;
-              return (
-                <Pressable
-                  key={chip}
-                  className={`px-4 py-2 rounded-full border ${
-                    active
-                      ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
-                      : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
-                  }`}
-                  accessibilityRole="button"
-                  onPress={() => setActiveChip(chip)}
-                >
-                  <AppText
-                    className={`text-xs ${
-                      active
-                        ? "text-white dark:text-slate-950"
-                        : "text-slate-600 dark:text-slate-300"
-                    }`}
-                  >
-                    {chip}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          {renderFilterChips()}
 
           <View className="mt-3 gap-4">
             {Array.from({ length: 4 }).map((_, index) => (
@@ -423,6 +538,13 @@ export default function RantsScreen() {
           data={rants}
           keyExtractor={(item) => item.id}
           contentContainerClassName="px-5 pt-5 pb-20"
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.mutedText}
+            />
+          }
           onEndReachedThreshold={0.5}
           onEndReached={() => {
             if (!isLoadingMore && hasMore) {
@@ -449,38 +571,7 @@ export default function RantsScreen() {
               />
 
               <View className="h-4" />
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerClassName="gap-2 pb-1"
-              >
-                {RANT_FILTER_CHIPS.map((chip) => {
-                  const active = chip === activeChip;
-                  return (
-                    <Pressable
-                      key={chip}
-                      className={`px-4 py-2 rounded-full border ${
-                        active
-                          ? "bg-green-600 border-green-600 dark:bg-green-400 dark:border-green-400"
-                          : "bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
-                      }`}
-                      accessibilityRole="button"
-                      onPress={() => setActiveChip(chip)}
-                    >
-                      <AppText
-                        className={`text-xs ${
-                          active
-                            ? "text-white dark:text-slate-950"
-                            : "text-slate-600 dark:text-slate-300"
-                        }`}
-                      >
-                        {chip}
-                      </AppText>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              {renderFilterChips()}
 
               <View className="h-3" />
             </>
@@ -605,6 +696,15 @@ export default function RantsScreen() {
             </View>
           )}
           ItemSeparatorComponent={() => <View className="h-4" />}
+          ListEmptyComponent={
+            !isLoading ? (
+              <View className="items-center justify-center py-16">
+                <AppText className="text-sm text-slate-500 dark:text-slate-400 text-center">
+                  No rants in this category yet. Be the first to rant.
+                </AppText>
+              </View>
+            ) : null
+          }
           ListFooterComponent={
             isLoadingMore ? (
               <AppText className="text-xs text-center mt-4 text-slate-400 dark:text-slate-500">

@@ -22,9 +22,9 @@ type NotificationItem = {
   title: string;
   body: string | null;
   type: string | null;
-  target_type: string | null;
-  target_id: string | null;
-  deep_link: string | null;
+  target_type?: string | null;
+  target_id?: string | null;
+  deep_link?: string | null;
   is_read: boolean;
   created_at: string;
 };
@@ -99,7 +99,7 @@ export default function NotificationScreen() {
       setIsLoading(true);
       setErrorMessage(null);
 
-      let query = supabase
+      const detailedQuery = supabase
         .from("notifications")
         .select(
           "id, title, body, type, target_type, target_id, deep_link, is_read, created_at",
@@ -107,7 +107,36 @@ export default function NotificationScreen() {
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
 
-      const { data, error } = await query;
+      const detailedResult = await detailedQuery;
+      let data: NotificationItem[] | null = (detailedResult.data ?? null) as
+        | NotificationItem[]
+        | null;
+      let error = detailedResult.error;
+
+      if (
+        error &&
+        /column .*target_type|target_id|deep_link.* does not exist/i.test(
+          error.message,
+        )
+      ) {
+        const fallbackQuery = supabase
+          .from("notifications")
+          .select("id, title, body, type, is_read, created_at")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false });
+
+        const fallbackResult = await fallbackQuery;
+        data = (fallbackResult.data ?? []).map((item) => ({
+          ...(item as Omit<
+            NotificationItem,
+            "target_type" | "target_id" | "deep_link"
+          >),
+          target_type: null,
+          target_id: null,
+          deep_link: null,
+        }));
+        error = fallbackResult.error;
+      }
 
       if (!isMounted) return;
 
