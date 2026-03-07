@@ -10,6 +10,7 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
+import { MarkerDragStartEndEvent } from 'react-native-maps';
 
 export default function CreateEventScreen() {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function CreateEventScreen() {
     longitude: 38.4768,
   });
 
-  const mapRef = useRef(null);
+  const mapRef = useRef<MapView>(null);
 
   const parseDateTime = (datePart: string, timePartRaw: string) => {
     const dateTrimmed = datePart.trim();
@@ -59,7 +60,7 @@ export default function CreateEventScreen() {
     return `${dateTrimmed}T${timePart}${offset}`;
   };
 
-  const handleMarkerDragEnd = async (e) => {
+  const handleMarkerDragEnd = async (e:MarkerDragStartEndEvent) => {
     const newCoordinate = e.nativeEvent.coordinate;
     setMarkerCoord(newCoordinate);
 

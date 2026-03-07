@@ -16,6 +16,7 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
+import { MarkerDragStartEndEvent } from 'react-native-maps';
 
 const categories = ["Cafe", "Library", "Hangout", "Study", "Food", "Other"];
 
@@ -43,10 +44,10 @@ export default function CreateSpotScreen() {
     latitude: 7.0504,
     longitude: 38.4768,
   });
-  const mapRef = useRef(null);
+  const mapRef = useRef<MapView>(null);
 
   // Handle dragging the pin to get the address
-  const handleMarkerDragEnd = async (e) => {
+  const handleMarkerDragEnd = async (e:MarkerDragStartEndEvent) => {
     const newCoordinate = e.nativeEvent.coordinate;
     setMarkerCoord(newCoordinate);
 
