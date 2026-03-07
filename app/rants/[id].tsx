@@ -158,8 +158,15 @@ export default function RantCommentsScreen() {
 
       if (isMounted) {
         const detail = (rantData as RantDetail) ?? null;
-        setRant(detail);
         const rows = (commentData ?? []) as RantComment[];
+        setRant(
+          detail
+            ? {
+                ...detail,
+                comment_count: rows.length,
+              }
+            : null,
+        );
         let likeMap = new Map<string, boolean>();
         const commentUserIds = Array.from(
           new Set(
@@ -725,7 +732,7 @@ export default function RantCommentsScreen() {
                     </View>
                   ) : null}
 
-                  <AppText className="text-[15px] leading-[22px] text-slate-900 dark:text-slate-100">
+                  <AppText className="text-[11px] leading-[22px] text-slate-900 dark:text-slate-100">
                     {rant?.content ?? "Rant not found."}
                   </AppText>
                 </>
