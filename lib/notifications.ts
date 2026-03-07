@@ -46,9 +46,19 @@ export async function registerForPushNotificationsAsync() {
   }
 
   const projectId = getProjectId();
-  const tokenResponse = await Notifications.getExpoPushTokenAsync({
-    projectId,
-  });
+  if (!projectId) {
+    // In dev/bare-like environments projectId may be unavailable.
+    return null;
+  }
+
+  let tokenResponse;
+  try {
+    tokenResponse = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
+  } catch {
+    return null;
+  }
 
   return tokenResponse.data;
 }

@@ -458,7 +458,7 @@ export default function SpotsTabScreen() {
           className="absolute right-8 bottom-24 min-h-10 px-3 rounded-full items-center justify-center bg-slate-900 dark:bg-slate-100"
         >
           <AppText className="text-sm font-semibold text-white dark:text-slate-900">
-            <AntDesign name="down" size={10} color="white" /> {unreadCount}
+            ⬇ {unreadCount}
           </AppText>
         </Pressable>
       ) : null}

@@ -78,12 +78,16 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
     let isMounted = true;
 
     const registerToken = async () => {
-      const token = await registerForPushNotificationsAsync();
-      if (!token || !isMounted) return;
+      try {
+        const token = await registerForPushNotificationsAsync();
+        if (!token || !isMounted) return;
 
-      await supabase.rpc("upsert_push_token", {
-        p_token: token,
-      });
+        await supabase.rpc("upsert_push_token", {
+          p_token: token,
+        });
+      } catch {
+        // Keep auth/session flow alive even if push registration fails.
+      }
     };
 
     void registerToken();
