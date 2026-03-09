@@ -8,7 +8,10 @@ import React, {
 } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
-import { registerForPushNotificationsAsync } from "../lib/notifications";
+import {
+  canUseRemotePushNotifications,
+  registerForPushNotificationsAsync,
+} from "../lib/notifications";
 
 type SupabaseContextValue = {
   session: Session | null;
@@ -74,6 +77,7 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
 
   useEffect(() => {
     if (!session?.user?.id) return;
+    if (!canUseRemotePushNotifications()) return;
 
     let isMounted = true;
 

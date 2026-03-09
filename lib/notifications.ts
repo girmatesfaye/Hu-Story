@@ -25,9 +25,11 @@ const isExpoGo = () =>
   Constants.appOwnership === "expo" ||
   Constants.executionEnvironment === "storeClient";
 
+export const canUseRemotePushNotifications = () =>
+  !isExpoGo() && Device.isDevice;
+
 export async function registerForPushNotificationsAsync() {
-  if (isExpoGo()) return null;
-  if (!Device.isDevice) return null;
+  if (!canUseRemotePushNotifications()) return null;
 
   const existingPermissions = await Notifications.getPermissionsAsync();
   let finalStatus = existingPermissions.status;
@@ -70,7 +72,11 @@ export async function registerForPushNotificationsAsync() {
 
 export async function syncAppBadgeCount(unreadCount: number) {
   const safeCount = Math.max(unreadCount, 0);
-  await Notifications.setBadgeCountAsync(safeCount);
+  try {
+    await Notifications.setBadgeCountAsync(safeCount);
+  } catch {
+    // Ignore unsupported badge APIs in limited runtimes.
+  }
 }
 
 type NotificationTargetInput = {
