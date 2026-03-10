@@ -12,10 +12,15 @@ import { FetchErrorModal } from "../components/FetchErrorModal";
 import { useSupabase } from "../providers/SupabaseProvider";
 import { useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
-import { getRouteFromNotificationTarget } from "../lib/notifications";
+import {
+  canUseRemotePushNotifications,
+  getRouteFromNotificationTarget,
+} from "../lib/notifications";
 export const unstable_settings = {
   anchor: "(tabs)",
 };
+
+void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -24,7 +29,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded) {
-      SplashScreen.hideAsync();
+      void SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
   if (!fontsLoaded) return null;
@@ -41,6 +46,8 @@ function RootNavigator() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!canUseRemotePushNotifications()) return;
+
     const handleResponse = (
       response: Notifications.NotificationResponse | null,
     ) => {

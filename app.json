@@ -11,7 +11,7 @@
       "supportsTablet": true
     },
     "splash": {
-      "image": "./assets/splashscreen_logo.png",
+      "image": "./assets/images/splashscreen_logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -46,6 +46,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cb176169-408d-4d08-bf64-9f71cb06b0c4"
+      }
     }
   }
 }

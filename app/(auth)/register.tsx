@@ -20,7 +20,7 @@ export default function RegisterScreen() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // New: Campus state
-  const [campus, setCampus] = useState("Hawassa University");
+  const [campus, setCampus] = useState("IOT");
   const [showCampusOptions, setShowCampusOptions] = useState(false);
   const campusOptions = [
     "Main",
