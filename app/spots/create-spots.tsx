@@ -32,19 +32,28 @@ const resolveHawassaLabel = (
   longitude: number,
 ) => {
   const country = place?.country?.toLowerCase() ?? "";
-  const region = (place?.region ?? "").toLowerCase();
-  const city = (place?.city ?? "").toLowerCase();
-  const district = (place?.district ?? "").toLowerCase();
+  const normalizedArea = [
+    place?.region,
+    place?.city,
+    place?.district,
+    place?.subregion,
+    place?.name,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 
   const isEthiopia = country.includes("ethiopia");
-  const isSidama = region.includes("sidama");
-  const isHawassa = city.includes("hawassa") || district.includes("hawassa");
+  const isSidama = normalizedArea.includes("sidama");
+  const isHawassa =
+    normalizedArea.includes("hawassa") || normalizedArea.includes("awassa");
   const isInTargetRegion = isEthiopia && (isSidama || isHawassa);
 
   if (!isInTargetRegion) {
     return {
       label: `${HAWASSA_REGION_LABEL} (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
       isInTargetRegion,
+      isEthiopia,
     };
   }
 
@@ -61,6 +70,7 @@ const resolveHawassaLabel = (
   return {
     label: labelParts.join(", "),
     isInTargetRegion,
+    isEthiopia,
   };
 };
 
@@ -196,7 +206,7 @@ export default function CreateSpotScreen() {
       });
       const place = places[0];
 
-      const { label, isInTargetRegion } = resolveHawassaLabel(
+      const { label, isInTargetRegion, isEthiopia } = resolveHawassaLabel(
         place,
         latitude,
         longitude,
@@ -206,12 +216,15 @@ export default function CreateSpotScreen() {
       showToast(
         isInTargetRegion
           ? "Location selected successfully."
-          : "Outside Hawassa area. Saved as Hawassa, Sidama, Ethiopia.",
-        isInTargetRegion ? "success" : "error",
+          : isEthiopia
+            ? "Location detected in Ethiopia. Saved in Hawassa format."
+            : "Outside Ethiopia. Saved as Hawassa, Sidama, Ethiopia.",
+        isInTargetRegion || isEthiopia ? "success" : "error",
       );
       void trackSmartlookEvent("spot_location_selected", {
         has_reverse_geocode: Boolean(place),
         in_target_region: isInTargetRegion,
+        in_ethiopia: isEthiopia,
       });
     } catch {
       showToast("Unable to fetch your current location.", "error");

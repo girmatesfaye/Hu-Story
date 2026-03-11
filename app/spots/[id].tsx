@@ -33,6 +33,43 @@ const fallbackSpotImage =
 const fallbackMapImage =
   "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80";
 
+// Detail formatting: normalize raw coordinate text to a clean degree-based display.
+const formatLocationLabel = (value: string | null | undefined) => {
+  if (!value?.trim()) return "Location TBD";
+
+  const withSuffixMatch = value.match(
+    /^(.*)\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)$/,
+  );
+  const pureCoordsMatch = value.match(
+    /^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/,
+  );
+
+  const formatCoords = (latitude: number, longitude: number) => {
+    const lat = `${Math.abs(latitude).toFixed(4)}°${latitude >= 0 ? "N" : "S"}`;
+    const lng = `${Math.abs(longitude).toFixed(4)}°${longitude >= 0 ? "E" : "W"}`;
+    return `${lat}, ${lng}`;
+  };
+
+  if (withSuffixMatch) {
+    const prefix = withSuffixMatch[1].trim();
+    const latitude = Number(withSuffixMatch[2]);
+    const longitude = Number(withSuffixMatch[3]);
+    if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+      return `${prefix} (${formatCoords(latitude, longitude)})`;
+    }
+  }
+
+  if (pureCoordsMatch) {
+    const latitude = Number(pureCoordsMatch[1]);
+    const longitude = Number(pureCoordsMatch[2]);
+    if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+      return formatCoords(latitude, longitude);
+    }
+  }
+
+  return value;
+};
+
 export default function SpotDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -167,7 +204,7 @@ export default function SpotDetailsScreen() {
                   color={colors.mutedText}
                 />
                 <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                  {spot?.location ?? "Location TBD"}
+                  {formatLocationLabel(spot?.location)}
                 </AppText>
               </View>
             </View>

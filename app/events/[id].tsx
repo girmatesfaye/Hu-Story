@@ -27,6 +27,43 @@ type EventDetail = {
   host_name: string | null;
 };
 
+// Detail formatting: normalize raw coordinate text to a clean degree-based display.
+const formatLocationLabel = (value: string | null | undefined) => {
+  if (!value?.trim()) return "Location TBD";
+
+  const withSuffixMatch = value.match(
+    /^(.*)\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)$/,
+  );
+  const pureCoordsMatch = value.match(
+    /^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/,
+  );
+
+  const formatCoords = (latitude: number, longitude: number) => {
+    const lat = `${Math.abs(latitude).toFixed(4)}°${latitude >= 0 ? "N" : "S"}`;
+    const lng = `${Math.abs(longitude).toFixed(4)}°${longitude >= 0 ? "E" : "W"}`;
+    return `${lat}, ${lng}`;
+  };
+
+  if (withSuffixMatch) {
+    const prefix = withSuffixMatch[1].trim();
+    const latitude = Number(withSuffixMatch[2]);
+    const longitude = Number(withSuffixMatch[3]);
+    if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+      return `${prefix} (${formatCoords(latitude, longitude)})`;
+    }
+  }
+
+  if (pureCoordsMatch) {
+    const latitude = Number(pureCoordsMatch[1]);
+    const longitude = Number(pureCoordsMatch[2]);
+    if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+      return formatCoords(latitude, longitude);
+    }
+  }
+
+  return value;
+};
+
 const fallbackEventImage =
   "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80";
 
@@ -74,7 +111,7 @@ export default function EventDetailsScreen() {
     const { data, error } = await supabase
       .from("events")
       .select(
-        "id, title, description, start_at, end_at, location, address, cover_url, tags, attendees_count, likes, views, host_name",
+        "id, title, description, start_at, end_at, location, address, cover_url, tags, attendees_count, views, host_name",
       )
       .eq("id", id)
       .maybeSingle();
@@ -83,7 +120,19 @@ export default function EventDetailsScreen() {
       setFetchError(error.message);
       setEvent(null);
     } else {
-      setEvent((data as EventDetail) ?? null);
+      const { count: likesCount } = await supabase
+        .from("event_likes")
+        .select("*", { count: "exact", head: true })
+        .eq("event_id", id);
+
+      setEvent(
+        data
+          ? ({
+              ...(data as Omit<EventDetail, "likes">),
+              likes: likesCount ?? 0,
+            } as EventDetail)
+          : null,
+      );
     }
 
     setIsLoading(false);
@@ -424,7 +473,7 @@ export default function EventDetailsScreen() {
                     </View>
                     <View className="flex-1">
                       <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {event?.location ?? "Location TBD"}
+                        {formatLocationLabel(event?.location)}
                       </AppText>
                       <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         {event?.address ?? "Address TBD"}
@@ -503,7 +552,7 @@ export default function EventDetailsScreen() {
                   : "I'm Going"}
             </AppText>
           </Pressable>
-          <Pressable
+          {/* <Pressable
             onPress={handleToggleLike}
             disabled={isLikeUpdating || isPastEvent}
             className={`h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 ${
@@ -515,7 +564,7 @@ export default function EventDetailsScreen() {
               size={18}
               color={isLiked ? "#DC2626" : colors.text}
             />
-          </Pressable>
+          </Pressable> */}
         </View>
 
         <FetchErrorModal
