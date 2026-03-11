@@ -23,6 +23,46 @@ import * as Location from "expo-location";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { SPOT_CATEGORIES } from "../../constants/categories";
 import { trackSmartlookEvent } from "../../lib/smartlook";
+const HAWASSA_REGION_LABEL = "Hawassa, Sidama, Ethiopia";
+
+// Region guard: normalize resolved addresses to Hawassa/Sidama/Ethiopia for consistent location data.
+const resolveHawassaLabel = (
+  place: Location.LocationGeocodedAddress | undefined,
+  latitude: number,
+  longitude: number,
+) => {
+  const country = place?.country?.toLowerCase() ?? "";
+  const region = (place?.region ?? "").toLowerCase();
+  const city = (place?.city ?? "").toLowerCase();
+  const district = (place?.district ?? "").toLowerCase();
+
+  const isEthiopia = country.includes("ethiopia");
+  const isSidama = region.includes("sidama");
+  const isHawassa = city.includes("hawassa") || district.includes("hawassa");
+  const isInTargetRegion = isEthiopia && (isSidama || isHawassa);
+
+  if (!isInTargetRegion) {
+    return {
+      label: `${HAWASSA_REGION_LABEL} (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
+      isInTargetRegion,
+    };
+  }
+
+  const labelParts = [
+    place?.name,
+    place?.street,
+    "Hawassa",
+    "Sidama",
+    "Ethiopia",
+  ]
+    .filter(Boolean)
+    .filter((value, index, array) => array.indexOf(value) === index);
+
+  return {
+    label: labelParts.join(", "),
+    isInTargetRegion,
+  };
+};
 
 export default function CreateSpotScreen() {
   const router = useRouter();
@@ -156,15 +196,22 @@ export default function CreateSpotScreen() {
       });
       const place = places[0];
 
-      const resolvedLocation =
-        [place?.name, place?.street, place?.district, place?.city]
-          .filter(Boolean)
-          .join(", ") || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      const { label, isInTargetRegion } = resolveHawassaLabel(
+        place,
+        latitude,
+        longitude,
+      );
 
-      setLocation(resolvedLocation);
-      showToast("Location selected successfully.", "success");
+      setLocation(label);
+      showToast(
+        isInTargetRegion
+          ? "Location selected successfully."
+          : "Outside Hawassa area. Saved as Hawassa, Sidama, Ethiopia.",
+        isInTargetRegion ? "success" : "error",
+      );
       void trackSmartlookEvent("spot_location_selected", {
         has_reverse_geocode: Boolean(place),
+        in_target_region: isInTargetRegion,
       });
     } catch {
       showToast("Unable to fetch your current location.", "error");
@@ -416,7 +463,7 @@ export default function CreateSpotScreen() {
             </View>
             {isResolvingLocation ? (
               <AppText className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-                Fetching current location...
+                Fetching in Hawassa, Sidama, Ethiopia...
               </AppText>
             ) : null}
 
