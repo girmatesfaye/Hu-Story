@@ -27,6 +27,7 @@ import { useSupabase } from "../../providers/SupabaseProvider";
 
 // Current merge keeps image-cover upload and keyboard-aware form behavior for event create/edit.
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { formatEventDateRange } from "../../lib/eventDateTime";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { trackSmartlookEvent } from "../../lib/smartlook";
@@ -133,6 +134,7 @@ export default function CreateEventScreen() {
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [isLoadingEvent, setIsLoadingEvent] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -252,6 +254,51 @@ export default function CreateEventScreen() {
       return publicUrl;
     } finally {
       setIsUploadingCover(false);
+    }
+  };
+
+  // Safe map integration: request foreground location, reverse geocode, and fill the text location field.
+  const handleSelectCurrentLocation = async () => {
+    setIsResolvingLocation(true);
+
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        showToast("Location permission is required to select on map.", "error");
+        void trackSmartlookEvent("event_location_select_failed", {
+          reason: "permission_denied",
+        });
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = position.coords;
+      const places = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+      const place = places[0];
+
+      const resolvedLocation =
+        [place?.name, place?.street, place?.district, place?.city]
+          .filter(Boolean)
+          .join(", ") || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+
+      setLocation(resolvedLocation);
+      showToast("Location selected successfully.", "success");
+      void trackSmartlookEvent("event_location_selected", {
+        has_reverse_geocode: Boolean(place),
+      });
+    } catch {
+      showToast("Unable to fetch your current location.", "error");
+      void trackSmartlookEvent("event_location_select_failed", {
+        reason: "location_fetch_error",
+      });
+    } finally {
+      setIsResolvingLocation(false);
     }
   };
 
@@ -590,14 +637,20 @@ export default function CreateEventScreen() {
                       <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                         Where
                       </AppText>
-                      <Pressable className="flex-row items-center gap-2">
+                      <Pressable
+                        className="flex-row items-center gap-2"
+                        onPress={handleSelectCurrentLocation}
+                        disabled={isResolvingLocation}
+                      >
                         <Ionicons
                           name="map-outline"
                           size={14}
                           color={colors.accent}
                         />
                         <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-                          Select on Map
+                          {isResolvingLocation
+                            ? "Locating..."
+                            : "Select on Map"}
                         </AppText>
                       </Pressable>
                     </View>
@@ -628,7 +681,7 @@ export default function CreateEventScreen() {
                             color={colors.accent}
                           />
                           <AppText className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                            Hawassa Main Campus
+                            {location || "Hawassa Main Campus"}
                           </AppText>
                         </View>
                       </View>

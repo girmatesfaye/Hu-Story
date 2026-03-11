@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   TextInput,
-  useColorScheme,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -20,20 +19,14 @@ import { useTopToast } from "../../hooks/useTopToast";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { SPOT_CATEGORIES } from "../../constants/categories";
 import { trackSmartlookEvent } from "../../lib/smartlook";
 
 export default function CreateSpotScreen() {
   const router = useRouter();
-  const scheme = useColorScheme();
   const { session } = useSupabase();
-  const iconColors = {
-    text: scheme === "dark" ? "#E5E7EB" : "#0F172A",
-    muted: scheme === "dark" ? "#94A3B8" : "#64748B",
-    accent: scheme === "dark" ? "#4ADE80" : "#16A34A",
-    chipText: scheme === "dark" ? "#0B0B0B" : "#FFFFFF",
-  };
   const { colors } = useTheme();
   const [feeType, setFeeType] = useState<"free" | "paid">("free");
   const [priceAmount, setPriceAmount] = useState("");
@@ -46,6 +39,7 @@ export default function CreateSpotScreen() {
   const [descriptionHeight, setDescriptionHeight] = useState(140);
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { toast, showToast } = useTopToast();
@@ -134,6 +128,51 @@ export default function CreateSpotScreen() {
       return uploadedUrls;
     } finally {
       setIsUploadingImages(false);
+    }
+  };
+
+  // Safe map integration: resolve current GPS location and populate the spot location input.
+  const handleSelectCurrentLocation = async () => {
+    setIsResolvingLocation(true);
+
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        showToast("Location permission is required to select on map.", "error");
+        void trackSmartlookEvent("spot_location_select_failed", {
+          reason: "permission_denied",
+        });
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = position.coords;
+      const places = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+      const place = places[0];
+
+      const resolvedLocation =
+        [place?.name, place?.street, place?.district, place?.city]
+          .filter(Boolean)
+          .join(", ") || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+
+      setLocation(resolvedLocation);
+      showToast("Location selected successfully.", "success");
+      void trackSmartlookEvent("spot_location_selected", {
+        has_reverse_geocode: Boolean(place),
+      });
+    } catch {
+      showToast("Unable to fetch your current location.", "error");
+      void trackSmartlookEvent("spot_location_select_failed", {
+        reason: "location_fetch_error",
+      });
+    } finally {
+      setIsResolvingLocation(false);
     }
   };
 
@@ -367,10 +406,19 @@ export default function CreateSpotScreen() {
                   onChangeText={setLocation}
                 />
               </View>
-              <Pressable className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <Pressable
+                className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                onPress={handleSelectCurrentLocation}
+                disabled={isResolvingLocation}
+              >
                 <Ionicons name="map" size={18} color={colors.accent} />
               </Pressable>
             </View>
+            {isResolvingLocation ? (
+              <AppText className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+                Fetching current location...
+              </AppText>
+            ) : null}
 
             <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Fee
