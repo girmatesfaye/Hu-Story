@@ -8,9 +8,9 @@ import { useRouter } from "expo-router";
 import { supabase } from "../../lib/supabase";
 
 const settingsLinks = {
-  instagram: "https://instagram.com/",
+  tiktok: "https://tiktok.com/@girma_thoughts",
   twitter: "https://x.com/",
-  telegram: "https://t.me/",
+  telegram: "https://t.me/girma_thoughts",
   terms: "https://example.com/terms",
   privacy: "https://example.com/privacy",
 };
@@ -90,11 +90,11 @@ export default function SettingsScreen() {
           </AppText>
           <View className="mt-3 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <SettingRow
-              label="Instagram"
-              icon="logo-instagram"
+              label="TikTok"
+              icon="logo-tiktok"
               iconBg="#FCE7F3"
               iconColor="#EC4899"
-              onPress={() => openUrl(settingsLinks.instagram)}
+              onPress={() => openUrl(settingsLinks.tiktok)}
             />
             <View className="h-px bg-slate-100 dark:bg-slate-800" />
             <SettingRow

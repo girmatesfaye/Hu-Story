@@ -29,6 +29,7 @@ import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
 import { formatEventDateRange } from "../../lib/eventDateTime";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { trackSmartlookEvent } from "../../lib/smartlook";
 
 type PickerTarget = "startDate" | "startTime" | "endDate" | "endTime";
 
@@ -317,6 +318,15 @@ export default function CreateEventScreen() {
   };
 
   const handleSubmit = async () => {
+    // Smartlook phase-1 integration: track event create/edit attempts and outcomes.
+    void trackSmartlookEvent(
+      isEditing ? "event_edit_attempt" : "event_create_attempt",
+      {
+        fee_type: feeType,
+        has_cover: Boolean(coverImageUri || coverImageUrl),
+      },
+    );
+
     if (!session?.user) {
       showToast("Please fill all required fields.", "error");
       return;
@@ -381,9 +391,22 @@ export default function CreateEventScreen() {
 
     if (error) {
       showToast("Something went wrong. Please try again.", "error");
+      void trackSmartlookEvent(
+        isEditing ? "event_edit_failed" : "event_create_failed",
+        {
+          fee_type: feeType,
+        },
+      );
       return;
     }
 
+    void trackSmartlookEvent(
+      isEditing ? "event_edit_success" : "event_create_success",
+      {
+        fee_type: feeType,
+        has_cover: Boolean(coverUrl),
+      },
+    );
     showToast("Successfully created.", "success");
     setTimeout(() => {
       router.replace("/(tabs)/events");

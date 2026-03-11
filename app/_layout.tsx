@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import "react-native-reanimated";
@@ -7,15 +7,14 @@ import { useTheme } from "../hooks/useTheme";
 import { useEffect } from "react";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import { SupabaseProvider } from "../providers/SupabaseProvider";
+import { SupabaseProvider, useSupabase } from "../providers/SupabaseProvider";
 import { FetchErrorModal } from "../components/FetchErrorModal";
-import { useSupabase } from "../providers/SupabaseProvider";
-import { useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
 import {
   canUseRemotePushNotifications,
   getRouteFromNotificationTarget,
 } from "../lib/notifications";
+import { initSmartlook, trackSmartlookScreen } from "../lib/smartlook";
 export const unstable_settings = {
   anchor: "(tabs)",
 };
@@ -44,6 +43,17 @@ function RootNavigator() {
   const { colors, statusBarStyle } = useTheme();
   const { sessionExpiredMessage, dismissSessionExpiredMessage } = useSupabase();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Smartlook phase-1 integration: initialize recording once app shell is mounted.
+  useEffect(() => {
+    void initSmartlook();
+  }, []);
+
+  // Smartlook phase-1 integration: track route transitions from Expo Router.
+  useEffect(() => {
+    void trackSmartlookScreen(pathname);
+  }, [pathname]);
 
   useEffect(() => {
     if (!canUseRemotePushNotifications()) return;

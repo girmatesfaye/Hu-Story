@@ -7,7 +7,8 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
-
+import { TopToast } from "@/components/TopToast";
+import { trackSmartlookEvent } from "../../lib/smartlook";
 export default function RegisterScreen() {
   const { colors, statusBarStyle } = useTheme();
   const router = useRouter();
@@ -32,13 +33,22 @@ export default function RegisterScreen() {
   ];
 
   const handleRegister = async () => {
+    // Smartlook phase-1 integration: log registration attempts and outcomes.
+    void trackSmartlookEvent("auth_register_attempt", { campus });
+
     if (!agreed) {
       setErrorMessage("Please agree to the campus rules to continue.");
+      void trackSmartlookEvent("auth_register_validation_failed", {
+        reason: "rules_not_accepted",
+      });
       return;
     }
 
     if (!email.trim() || !password) {
       setErrorMessage("Enter your email and password.");
+      void trackSmartlookEvent("auth_register_validation_failed", {
+        reason: "missing_credentials",
+      });
       return;
     }
 
@@ -59,11 +69,22 @@ export default function RegisterScreen() {
     setIsLoading(false);
 
     if (error) {
-      setErrorMessage(error.message);
+      TopToast({
+        visible: true,
+        message: error.message || "Registration failed. Please try again.",
+        variant: "error",
+      });
+      void trackSmartlookEvent("auth_register_failed", {
+        reason: error.message,
+        campus,
+      });
       return;
     }
-
-    setSuccessMessage("Account created. Please check your email to confirm.");
+    setSuccessMessage("Registration successful! Please Login.");
+    void trackSmartlookEvent("auth_register_success", {
+      campus,
+      email_domain: email.includes("@") ? email.split("@")[1] : "unknown",
+    });
   };
 
   return (

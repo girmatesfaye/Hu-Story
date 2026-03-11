@@ -8,6 +8,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { isAdminUser } from "../../constants/admin";
+import { trackSmartlookEvent } from "../../lib/smartlook";
 
 export default function LoginScreen() {
   const { colors, statusBarStyle } = useTheme();
@@ -19,8 +20,12 @@ export default function LoginScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleLogin = async () => {
+    // Smartlook phase-1 integration: log auth attempts and outcomes.
+    void trackSmartlookEvent("auth_login_attempt");
+
     if (!email.trim() || !password) {
       setErrorMessage("Enter your email and password.");
+      void trackSmartlookEvent("auth_login_validation_failed");
       return;
     }
 
@@ -36,8 +41,15 @@ export default function LoginScreen() {
 
     if (error) {
       setErrorMessage(error.message);
+      void trackSmartlookEvent("auth_login_failed", {
+        reason: error.message,
+      });
       return;
     }
+
+    void trackSmartlookEvent("auth_login_success", {
+      user_id: data.user?.id,
+    });
 
     const isAdmin = await isAdminUser();
     if (isAdmin) {

@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
+import { trackSmartlookEvent } from "../../lib/smartlook";
 export default function CreateProjectsScreen() {
   const router = useRouter();
   const { colors, statusBarStyle } = useTheme();
@@ -106,6 +107,12 @@ export default function CreateProjectsScreen() {
   };
 
   const handleSubmit = async () => {
+    // Smartlook phase-1 integration: track project creation attempts and outcomes.
+    void trackSmartlookEvent("project_create_attempt", {
+      is_anonymous: isAnonymous,
+      has_cover: Boolean(coverImageUri),
+    });
+
     if (!session?.user) {
       showToast("Please fill all required fields.", "error");
       return;
@@ -140,9 +147,17 @@ export default function CreateProjectsScreen() {
 
     if (error) {
       showToast("Something went wrong. Please try again.", "error");
+      void trackSmartlookEvent("project_create_failed", {
+        is_anonymous: isAnonymous,
+      });
       return;
     }
 
+    void trackSmartlookEvent("project_create_success", {
+      is_anonymous: isAnonymous,
+      has_cover: Boolean(coverUrl),
+      has_repo_url: Boolean(repoUrl.trim()),
+    });
     showToast("Successfully created.", "success");
     setTimeout(() => {
       router.replace("/(tabs)/projects");

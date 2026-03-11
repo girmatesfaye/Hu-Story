@@ -12,6 +12,7 @@ import {
   canUseRemotePushNotifications,
   registerForPushNotificationsAsync,
 } from "../lib/notifications";
+import { identifySmartlookUser } from "../lib/smartlook";
 
 type SupabaseContextValue = {
   session: Session | null;
@@ -100,6 +101,14 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
       isMounted = false;
     };
   }, [session?.user?.id]);
+
+  // Smartlook phase-1 integration: keep Smartlook user identity aligned with auth state.
+  useEffect(() => {
+    void identifySmartlookUser({
+      id: session?.user?.id,
+      email: session?.user?.email,
+    });
+  }, [session?.user?.email, session?.user?.id]);
 
   return (
     <SupabaseContext.Provider

@@ -22,6 +22,7 @@ import { useSupabase } from "../../providers/SupabaseProvider";
 import * as ImagePicker from "expo-image-picker";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { SPOT_CATEGORIES } from "../../constants/categories";
+import { trackSmartlookEvent } from "../../lib/smartlook";
 
 export default function CreateSpotScreen() {
   const router = useRouter();
@@ -137,6 +138,13 @@ export default function CreateSpotScreen() {
   };
 
   const handleSubmit = async () => {
+    // Smartlook phase-1 integration: track spot creation attempts and outcomes.
+    void trackSmartlookEvent("spot_create_attempt", {
+      category: selectedCategory,
+      fee_type: feeType,
+      image_count: imageUris.length,
+    });
+
     if (!session?.user) {
       showToast("Please fill all required fields.", "error");
       return;
@@ -188,6 +196,10 @@ export default function CreateSpotScreen() {
     if (spotError || !spotRow) {
       setIsSubmitting(false);
       showToast("Something went wrong. Please try again.", "error");
+      void trackSmartlookEvent("spot_create_failed", {
+        category: selectedCategory,
+        fee_type: feeType,
+      });
       return;
     }
 
@@ -208,6 +220,11 @@ export default function CreateSpotScreen() {
     }
 
     setIsSubmitting(false);
+    void trackSmartlookEvent("spot_create_success", {
+      category: selectedCategory,
+      fee_type: feeType,
+      image_count: uploadedUrls.length,
+    });
     showToast("Successfully created.", "success");
     setTimeout(() => {
       router.replace("/(tabs)/spots");

@@ -20,6 +20,7 @@ import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
 import { useTheme } from "../../hooks/useTheme";
 import { RANT_CATEGORIES } from "../../constants/categories";
+import { trackSmartlookEvent } from "../../lib/smartlook";
 export default function CreateRantScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -50,6 +51,12 @@ export default function CreateRantScreen() {
   }, []);
 
   const handleSubmit = async () => {
+    // Smartlook phase-1 integration: track rant creation attempts and outcomes.
+    void trackSmartlookEvent("rant_create_attempt", {
+      category: activeCategory,
+      is_anonymous: isAnonymous,
+    });
+
     if (!session?.user) {
       showToast("Please fill all required fields.", "error");
       return;
@@ -73,9 +80,16 @@ export default function CreateRantScreen() {
 
     if (error) {
       showToast("Something went wrong. Please try again.", "error");
+      void trackSmartlookEvent("rant_create_failed", {
+        category: activeCategory,
+      });
       return;
     }
 
+    void trackSmartlookEvent("rant_create_success", {
+      category: activeCategory,
+      is_anonymous: isAnonymous,
+    });
     showToast("Successfully created.", "success");
     setTimeout(() => {
       router.replace("/(tabs)/rants");
