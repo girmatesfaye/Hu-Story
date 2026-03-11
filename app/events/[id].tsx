@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -25,41 +32,81 @@ type EventDetail = {
   host_name: string | null;
 };
 
-// Detail formatting: normalize raw coordinate text to a clean degree-based display.
+const HAWASSA_DEFAULT_COORDS = {
+  latitude: 7.0504,
+  longitude: 38.4955,
+};
+
+// Event location cleanup: remove plus-code and Ethiopia suffix to keep labels short and readable.
+const sanitizeLocationText = (value: string) => {
+  return value
+    .replace(/^[A-Z0-9]{3,}\+[A-Z0-9]{2,}[\.,]?\s*/i, "")
+    .replace(/\bethiopi(?:a)?\b/gi, "")
+    .replace(/\s*\.\s*/g, ", ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/(,\s*){2,}/g, ", ")
+    .replace(/^,\s*|,\s*$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
+// Event location formatting: keep label human-readable without degree coordinate text.
 const formatLocationLabel = (value: string | null | undefined) => {
   if (!value?.trim()) return "Location TBD";
 
   const withSuffixMatch = value.match(
     /^(.*)\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)$/,
   );
+  if (withSuffixMatch) return withSuffixMatch[1].trim();
+
   const pureCoordsMatch = value.match(
     /^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/,
   );
+  if (pureCoordsMatch) return "Selected campus location";
 
-  const formatCoords = (latitude: number, longitude: number) => {
-    const lat = `${Math.abs(latitude).toFixed(4)}°${latitude >= 0 ? "N" : "S"}`;
-    const lng = `${Math.abs(longitude).toFixed(4)}°${longitude >= 0 ? "E" : "W"}`;
-    return `${lat}, ${lng}`;
-  };
+  const cleaned = sanitizeLocationText(value.trim());
+  return cleaned || "Location TBD";
+};
 
-  if (withSuffixMatch) {
-    const prefix = withSuffixMatch[1].trim();
-    const latitude = Number(withSuffixMatch[2]);
-    const longitude = Number(withSuffixMatch[3]);
-    if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
-      return `${prefix} (${formatCoords(latitude, longitude)})`;
+// Map helpers: parse coordinates and build a directions URL without paid map previews.
+const extractCoordinates = (value: string | null | undefined) => {
+  if (!value?.trim()) return null;
+
+  const suffixMatch = value.match(
+    /\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)$/,
+  );
+  const directMatch = value.match(/^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/);
+  const matched = suffixMatch ?? directMatch;
+  if (!matched) return null;
+
+  const latitude = Number(matched[1]);
+  const longitude = Number(matched[2]);
+  if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
+
+  return { latitude, longitude };
+};
+
+const getDirectionsUrl = (location: string | null, address: string | null) => {
+  const fromLocation = extractCoordinates(location);
+  const fromAddress = extractCoordinates(address);
+  const coords = fromLocation ?? fromAddress;
+
+  if (coords) {
+    if (Platform.OS === "ios") {
+      return `http://maps.apple.com/?ll=${coords.latitude},${coords.longitude}`;
     }
+
+    return `geo:${coords.latitude},${coords.longitude}?q=${coords.latitude},${coords.longitude}`;
   }
 
-  if (pureCoordsMatch) {
-    const latitude = Number(pureCoordsMatch[1]);
-    const longitude = Number(pureCoordsMatch[2]);
-    if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
-      return formatCoords(latitude, longitude);
-    }
+  const query = [address, location].filter(Boolean).join(", ").trim();
+  if (!query) return null;
+
+  if (Platform.OS === "ios") {
+    return `http://maps.apple.com/?q=${encodeURIComponent(query)}`;
   }
 
-  return value;
+  return `geo:0,0?q=${encodeURIComponent(query)}`;
 };
 
 const fallbackEventImage =
@@ -86,6 +133,19 @@ export default function EventDetailsScreen() {
   const [isGoing, setIsGoing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+
+  const directionsUrl = useMemo(
+    () => getDirectionsUrl(event?.location ?? null, event?.address ?? null),
+    [event?.address, event?.location],
+  );
+
+  const locationCoordinates = useMemo(
+    () =>
+      extractCoordinates(event?.location ?? null) ??
+      extractCoordinates(event?.address ?? null) ??
+      HAWASSA_DEFAULT_COORDS,
+    [event?.address, event?.location],
+  );
 
   const isPastEvent = useMemo(() => {
     const reference = event?.end_at ?? event?.start_at;
@@ -235,6 +295,25 @@ export default function EventDetailsScreen() {
     setIsUpdating(false);
   };
 
+  // Get directions action: open native map directions with event location query.
+  const handleOpenDirections = async () => {
+    if (!directionsUrl) {
+      setErrorMessage("Location is not available for directions.");
+      return;
+    }
+
+    try {
+      const supported = await Linking.canOpenURL(directionsUrl);
+      if (!supported) {
+        setErrorMessage("Unable to open map directions.");
+        return;
+      }
+      await Linking.openURL(directionsUrl);
+    } catch {
+      setErrorMessage("Unable to open map directions.");
+    }
+  };
+
   const dateBadge = useMemo(() => {
     if (!event?.start_at) return { month: "TBD", day: "--" };
     const date = new Date(event.start_at);
@@ -374,7 +453,7 @@ export default function EventDetailsScreen() {
                         {formatLocationLabel(event?.location)}
                       </AppText>
                       <AppText className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {event?.address ?? "Address TBD"}
+                        {formatLocationLabel(event?.address) || "Address"}
                       </AppText>
                     </View>
                   </View>
@@ -400,26 +479,45 @@ export default function EventDetailsScreen() {
                   {event?.description ?? "No description yet."}
                 </AppText>
 
-                <View className="mt-6 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-                  <Image
-                    source={{
-                      uri: "https://images.unsplash.com/photo-1526779259212-939e64788e3c?auto=format&fit=crop&w=1200&q=80",
-                    }}
-                    className="h-[160px] w-full"
-                    resizeMode="cover"
-                  />
-                  <View className="absolute inset-0 bg-black/20" />
-                  <View className="absolute inset-x-0 bottom-4 items-center">
-                    <Pressable className="flex-row items-center gap-2 rounded-full bg-white px-4 py-2 shadow">
-                      <Ionicons
-                        name="navigate"
-                        size={16}
-                        color={colors.accent}
-                      />
-                      <AppText className="text-sm font-semibold text-slate-900">
-                        Get Directions
-                      </AppText>
-                    </Pressable>
+                <View className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
+                  <View className="h-[160px] justify-between bg-green-50 px-5 py-5 dark:bg-green-950/30">
+                    <View className="flex-row items-start justify-between gap-4">
+                      <View className="flex-1">
+                        <AppText className="text-xs font-semibold uppercase tracking-[1px] text-green-700 dark:text-green-300">
+                          Directions
+                        </AppText>
+                        <AppText className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                          {formatLocationLabel(event?.location)}
+                        </AppText>
+                        <AppText className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {locationCoordinates.latitude.toFixed(5)},{" "}
+                          {locationCoordinates.longitude.toFixed(5)}
+                        </AppText>
+                      </View>
+                      <View className="h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-slate-800">
+                        <Ionicons
+                          name="navigate-circle"
+                          size={28}
+                          color={colors.accent}
+                        />
+                      </View>
+                    </View>
+
+                    <View className="items-start">
+                      <Pressable
+                        className="flex-row items-center gap-2 rounded-full bg-white px-4 py-2 shadow dark:bg-slate-800"
+                        onPress={() => void handleOpenDirections()}
+                      >
+                        <Ionicons
+                          name="navigate"
+                          size={16}
+                          color={colors.accent}
+                        />
+                        <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          Get Directions
+                        </AppText>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
               </View>

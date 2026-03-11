@@ -24,6 +24,7 @@ import { TabHeader } from "../../components/TabHeader";
 import { useTheme } from "../../hooks/useTheme";
 import { supabase } from "../../lib/supabase";
 import { formatEventDateRange } from "../../lib/eventDateTime";
+import { formatCompactCampusLocation } from "../../lib/ui/formatters";
 
 const buildDateChips = (count: number) =>
   Array.from({ length: count }, (_, index) => {
@@ -157,8 +158,11 @@ function EventCard({
 
         <View className="mt-1 flex-row items-center gap-2">
           <Ionicons name="location-outline" size={14} color={iconColor} />
-          <AppText className="text-xs text-slate-500 dark:text-slate-400">
-            {location}
+          <AppText
+            numberOfLines={1}
+            className="flex-1 text-xs text-slate-500 dark:text-slate-400"
+          >
+            {formatCompactCampusLocation(location)}
           </AppText>
         </View>
 

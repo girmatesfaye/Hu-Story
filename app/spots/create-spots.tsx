@@ -23,55 +23,76 @@ import * as Location from "expo-location";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { SPOT_CATEGORIES } from "../../constants/categories";
 import { trackSmartlookEvent } from "../../lib/smartlook";
-const HAWASSA_REGION_LABEL = "Hawassa, Sidama, Ethiopia";
 
-// Region guard: normalize resolved addresses to Hawassa/Sidama/Ethiopia for consistent location data.
-const resolveHawassaLabel = (
+const removePlusCode = (value: string) =>
+  value
+    .replace(/^[A-Z0-9]{3,}\+[A-Z0-9]{2,}[\.,]?\s*/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+const normalizePlaceFragment = (value: string | null | undefined) => {
+  if (!value) return "";
+  return removePlusCode(value)
+    .replace(/\bregion\b/gi, "")
+    .replace(/\bSidama\b/gi, "")
+    .replace(/\bEthiopi(?:a)?\b/gi, "")
+    .replace(/^,\s*|,\s*$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
+const isGenericArea = (value: string) => {
+  const normalized = value.toLowerCase().trim();
+  return (
+    normalized === "hawassa" ||
+    normalized === "awassa" ||
+    normalized === "sidama" ||
+    normalized === "region hawassa"
+  );
+};
+
+const isPostalOrCodeLike = (value: string) => {
+  const normalized = value.trim();
+  return (
+    /^\d{3,}$/.test(normalized) ||
+    /^[A-Z0-9]{3,}\+[A-Z0-9]{2,}$/i.test(normalized)
+  );
+};
+
+const isUsefulAreaName = (value: string) => {
+  const cleaned = normalizePlaceFragment(value);
+  if (!cleaned) return false;
+  if (isGenericArea(cleaned)) return false;
+  if (isPostalOrCodeLike(cleaned)) return false;
+  return true;
+};
+
+// Location extraction policy: neighborhood > sublocality > route.
+const extractPreferredArea = (
   place: Location.LocationGeocodedAddress | undefined,
-  latitude: number,
-  longitude: number,
 ) => {
-  const country = place?.country?.toLowerCase() ?? "";
-  const normalizedArea = [
-    place?.region,
-    place?.city,
-    place?.district,
-    place?.subregion,
-    place?.name,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+  const geo = (place ?? {}) as Location.LocationGeocodedAddress & {
+    neighborhood?: string;
+    sublocality?: string;
+    route?: string;
+  };
 
-  const isEthiopia = country.includes("ethiopia");
-  const isSidama = normalizedArea.includes("sidama");
-  const isHawassa =
-    normalizedArea.includes("hawassa") || normalizedArea.includes("awassa");
-  const isInTargetRegion = isEthiopia && (isSidama || isHawassa);
+  const candidates = [
+    geo.neighborhood,
+    geo.sublocality,
+    geo.route,
+    geo.district,
+    geo.subregion,
+    geo.street,
+    geo.name,
+  ];
 
-  if (!isInTargetRegion) {
-    return {
-      label: `${HAWASSA_REGION_LABEL} (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
-      isInTargetRegion,
-      isEthiopia,
-    };
+  for (const candidate of candidates) {
+    const cleaned = normalizePlaceFragment(candidate);
+    if (cleaned && isUsefulAreaName(cleaned)) return cleaned;
   }
 
-  const labelParts = [
-    place?.name,
-    place?.street,
-    "Hawassa",
-    "Sidama",
-    "Ethiopia",
-  ]
-    .filter(Boolean)
-    .filter((value, index, array) => array.indexOf(value) === index);
-
-  return {
-    label: labelParts.join(", "),
-    isInTargetRegion,
-    isEthiopia,
-  };
+  return null;
 };
 
 export default function CreateSpotScreen() {
@@ -90,6 +111,12 @@ export default function CreateSpotScreen() {
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const [requiresLandmarkHint, setRequiresLandmarkHint] = useState(false);
+  const [landmarkInput, setLandmarkInput] = useState("");
+  const [selectedCoordinates, setSelectedCoordinates] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { toast, showToast } = useTopToast();
@@ -181,7 +208,7 @@ export default function CreateSpotScreen() {
     }
   };
 
-  // Safe map integration: resolve current GPS location and populate the spot location input.
+  // Safe map integration: pick GPS, reverse geocode, and store user-friendly "Area, Hawassa".
   const handleSelectCurrentLocation = async () => {
     setIsResolvingLocation(true);
 
@@ -200,31 +227,33 @@ export default function CreateSpotScreen() {
       });
 
       const { latitude, longitude } = position.coords;
+      setSelectedCoordinates({ latitude, longitude });
+
       const places = await Location.reverseGeocodeAsync({
         latitude,
         longitude,
       });
       const place = places[0];
 
-      const { label, isInTargetRegion, isEthiopia } = resolveHawassaLabel(
-        place,
-        latitude,
-        longitude,
-      );
+      const area = extractPreferredArea(place);
 
-      setLocation(label);
-      showToast(
-        isInTargetRegion
-          ? "Location selected successfully."
-          : isEthiopia
-            ? "Location detected in Ethiopia. Saved in Hawassa format."
-            : "Outside Ethiopia. Saved as Hawassa, Sidama, Ethiopia.",
-        isInTargetRegion || isEthiopia ? "success" : "error",
-      );
+      if (area) {
+        setLocation(`${area}, Hawassa`);
+        setRequiresLandmarkHint(false);
+        setLandmarkInput("");
+        showToast("Location selected successfully.", "success");
+      } else {
+        setLocation("");
+        setRequiresLandmarkHint(true);
+        showToast(
+          "This place has no name. Please enter a nearby landmark.",
+          "error",
+        );
+      }
+
       void trackSmartlookEvent("spot_location_selected", {
         has_reverse_geocode: Boolean(place),
-        in_target_region: isInTargetRegion,
-        in_ethiopia: isEthiopia,
+        has_area_name: Boolean(area),
       });
     } catch {
       showToast("Unable to fetch your current location.", "error");
@@ -233,6 +262,16 @@ export default function CreateSpotScreen() {
       });
     } finally {
       setIsResolvingLocation(false);
+    }
+  };
+
+  // Manual entry keeps relative places (e.g., "Near Hawassa University") exactly as user types.
+  const handleLocationChange = (value: string) => {
+    const cleaned = removePlusCode(value);
+    setLocation(cleaned);
+
+    if (cleaned.trim().length > 0 && !isGenericArea(cleaned)) {
+      setRequiresLandmarkHint(false);
     }
   };
 
@@ -268,6 +307,25 @@ export default function CreateSpotScreen() {
       return;
     }
 
+    const cleanedLocation = removePlusCode(location).trim();
+    const cleanedLandmark = removePlusCode(landmarkInput).trim();
+
+    let locationToSave = cleanedLocation;
+    if (requiresLandmarkHint) {
+      if (!cleanedLandmark) {
+        showToast(
+          "This place has no name. Please enter a nearby landmark.",
+          "error",
+        );
+        return;
+      }
+
+      locationToSave = `Near ${cleanedLandmark}, Hawassa`;
+    } else if (isGenericArea(locationToSave)) {
+      showToast("Please add a specific nearby place.", "error");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const uploadedUrls = await uploadSpotImages();
@@ -283,7 +341,7 @@ export default function CreateSpotScreen() {
         user_id: session.user.id,
         name: name.trim(),
         category: selectedCategory,
-        location: location.trim() || null,
+        location: locationToSave || null,
         description: description.trim() || null,
         price_type: feeType,
         price_amount: feeType === "paid" ? parsedPrice : null,
@@ -323,6 +381,7 @@ export default function CreateSpotScreen() {
       category: selectedCategory,
       fee_type: feeType,
       image_count: uploadedUrls.length,
+      has_coordinates: Boolean(selectedCoordinates),
     });
     showToast("Successfully created.", "success");
     setTimeout(() => {
@@ -463,7 +522,7 @@ export default function CreateSpotScreen() {
                   placeholderTextColor={colors.mutedStrong}
                   className="flex-1 text-sm text-slate-900 dark:text-slate-100"
                   value={location}
-                  onChangeText={setLocation}
+                  onChangeText={handleLocationChange}
                 />
               </View>
               <Pressable
@@ -476,8 +535,24 @@ export default function CreateSpotScreen() {
             </View>
             {isResolvingLocation ? (
               <AppText className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-                Fetching in Hawassa, Sidama, Ethiopia...
+                Fetching Hawassa location...
               </AppText>
+            ) : null}
+            {requiresLandmarkHint ? (
+              <View className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 dark:border-amber-500/40 dark:bg-amber-900/20">
+                <AppText className="text-xs text-amber-700 dark:text-amber-300">
+                  This place has no name. Please enter a nearby landmark.
+                </AppText>
+                <View className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-2 dark:border-amber-500/50 dark:bg-slate-900">
+                  <TextInput
+                    placeholder="e.g. Hawassa University Main Gate"
+                    placeholderTextColor={colors.mutedStrong}
+                    className="text-sm text-slate-900 dark:text-slate-100"
+                    value={landmarkInput}
+                    onChangeText={setLandmarkInput}
+                  />
+                </View>
+              </View>
             ) : null}
 
             <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">

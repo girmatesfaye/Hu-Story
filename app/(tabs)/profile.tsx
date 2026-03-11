@@ -13,7 +13,10 @@ import { useSupabase } from "../../providers/SupabaseProvider";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { formatTimeAgo } from "../../lib/ui/formatters";
+import {
+  formatCompactCampusLocation,
+  formatTimeAgo,
+} from "../../lib/ui/formatters";
 
 type Profile = {
   full_name: string | null;
@@ -799,8 +802,11 @@ export default function ProfileTabScreen() {
                         size={14}
                         color={colors.accent}
                       />
-                      <AppText className="ml-2 text-xs text-slate-500 dark:text-slate-400">
-                        {spot.location ?? "Location TBD"}
+                      <AppText
+                        numberOfLines={1}
+                        className="ml-2 flex-1 text-xs text-slate-500 dark:text-slate-400"
+                      >
+                        {formatCompactCampusLocation(spot.location)}
                       </AppText>
                     </View>
                     <View className="mt-2 flex-row items-center gap-4">
@@ -964,8 +970,11 @@ export default function ProfileTabScreen() {
                         size={14}
                         color={colors.accent}
                       />
-                      <AppText className="ml-2 text-xs text-slate-500 dark:text-slate-400">
-                        {event.location ?? "Location TBD"}
+                      <AppText
+                        numberOfLines={1}
+                        className="ml-2 flex-1 text-xs text-slate-500 dark:text-slate-400"
+                      >
+                        {formatCompactCampusLocation(event.location)}
                       </AppText>
                     </View>
                     <View className="mt-2 flex-row items-center gap-1">

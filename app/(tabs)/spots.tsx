@@ -23,8 +23,8 @@ import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { TabHeader } from "../../components/TabHeader";
 import { useTheme } from "../../hooks/useTheme";
 import { supabase } from "../../lib/supabase";
-import AntDesign from "@expo/vector-icons/build/AntDesign";
 import { SPOT_FILTER_CATEGORIES } from "../../constants/categories";
+import { formatCompactCampusLocation } from "../../lib/ui/formatters";
 
 type SpotItem = {
   id: string;
@@ -392,8 +392,11 @@ export default function SpotsTabScreen() {
                         {spot.category ?? "Other"}
                       </AppText>
                     </View>
-                    <AppText className="text-xs text-slate-500 dark:text-slate-400">
-                      {spot.location ?? "Location TBD"}
+                    <AppText
+                      numberOfLines={1}
+                      className="flex-1 text-xs text-slate-500 dark:text-slate-400"
+                    >
+                      {formatCompactCampusLocation(spot.location)}
                     </AppText>
                   </View>
 
