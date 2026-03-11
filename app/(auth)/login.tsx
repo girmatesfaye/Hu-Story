@@ -31,33 +31,39 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     setErrorMessage(null);
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    setIsLoading(false);
-
-    if (error) {
-      setErrorMessage(error.message);
-      void trackSmartlookEvent("auth_login_failed", {
-        reason: error.message,
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
       });
-      return;
+
+      if (error) {
+        setErrorMessage(error.message);
+        void trackSmartlookEvent("auth_login_failed", {
+          reason: error.message,
+        });
+        return;
+      }
+
+      void trackSmartlookEvent("auth_login_success", {
+        user_id: data.user?.id,
+      });
+
+      const isAdmin = await isAdminUser();
+      if (isAdmin) {
+        router.replace("/admin");
+        return;
+      }
+
+      router.replace("/(tabs)/rants");
+    } catch {
+      setErrorMessage("Login failed. Please try again.");
+      void trackSmartlookEvent("auth_login_failed", {
+        reason: "unexpected_error",
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-    void trackSmartlookEvent("auth_login_success", {
-      user_id: data.user?.id,
-    });
-
-    const isAdmin = await isAdminUser();
-    if (isAdmin) {
-      router.replace("/admin");
-      return;
-    }
-
-    router.replace("/(tabs)/rants");
   };
 
   return (
@@ -161,7 +167,8 @@ export default function LoginScreen() {
                 </AppText>
               </TouchableOpacity>
 
-              <View className="mt-7 flex-row items-center gap-3">
+              {/* Social media login options and register link omitted for brevity */}
+              {/* <View className="mt-7 flex-row items-center gap-3">
                 <View className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                 <AppText className="text-xs font-semibold tracking-[2px] text-slate-400 dark:text-slate-500">
                   OR LOGIN WITH
@@ -182,7 +189,7 @@ export default function LoginScreen() {
                 >
                   <Ionicons name="logo-apple" size={20} color={colors.text} />
                 </TouchableOpacity>
-              </View>
+              </View> */}
 
               <View className="mt-6 flex-row items-center justify-center">
                 <AppText className="text-sm text-slate-500 dark:text-slate-400">

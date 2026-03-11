@@ -7,7 +7,6 @@ import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
-import { TopToast } from "@/components/TopToast";
 import { trackSmartlookEvent } from "../../lib/smartlook";
 export default function RegisterScreen() {
   const { colors, statusBarStyle } = useTheme();
@@ -55,36 +54,42 @@ export default function RegisterScreen() {
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: {
-          campus,
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            campus,
+          },
         },
-      },
-    });
-
-    setIsLoading(false);
-
-    if (error) {
-      TopToast({
-        visible: true,
-        message: error.message || "Registration failed. Please try again.",
-        variant: "error",
       });
+
+      if (error) {
+        setErrorMessage(
+          error.message || "Registration failed. Please try again.",
+        );
+        void trackSmartlookEvent("auth_register_failed", {
+          reason: error.message,
+          campus,
+        });
+        return;
+      }
+
+      setSuccessMessage("Registration successful! Please Login.");
+      void trackSmartlookEvent("auth_register_success", {
+        campus,
+        email_domain: email.includes("@") ? email.split("@")[1] : "unknown",
+      });
+    } catch {
+      setErrorMessage("Registration failed. Please try again.");
       void trackSmartlookEvent("auth_register_failed", {
-        reason: error.message,
+        reason: "unexpected_error",
         campus,
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    setSuccessMessage("Registration successful! Please Login.");
-    void trackSmartlookEvent("auth_register_success", {
-      campus,
-      email_domain: email.includes("@") ? email.split("@")[1] : "unknown",
-    });
   };
 
   return (
@@ -282,7 +287,7 @@ export default function RegisterScreen() {
               </View>
 
               {/* ---------- SOCIAL LOGIN ---------- */}
-              <View className="mt-6 flex-row items-center gap-3">
+              {/* <View className="mt-6 flex-row items-center gap-3">
                 <View className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                 <AppText className="text-xs text-slate-400 dark:text-slate-500">
                   Or continue with
@@ -303,7 +308,7 @@ export default function RegisterScreen() {
                 >
                   <Ionicons name="logo-apple" size={20} color={colors.text} />
                 </TouchableOpacity>
-              </View>
+              </View> */}
             </View>
           </View>
         </ScrollView>
