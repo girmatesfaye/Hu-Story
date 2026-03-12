@@ -33,7 +33,9 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/images/splashscreen_logo.png",
           "imageWidth": 150,
+          "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
             "backgroundColor": "#000000"
@@ -49,8 +51,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "cb176169-408d-4d08-bf64-9f71cb06b0c4"
+        "projectId": "85dd3245-e58c-4322-8e55-8255772cc627"
       }
-    }
+    },
+    "owner": "girmatesefaye"
   }
 }
