@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, View } from "react-native";
+import { Image, Linking, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
+import { TopToast } from "../../components/TopToast";
+import { useTopToast } from "../../hooks/useTopToast";
 import { useTheme } from "../../hooks/useTheme";
 import { supabase } from "../../lib/supabase";
 import {
@@ -36,6 +38,24 @@ const fallbackSpotImage =
 const fallbackMapImage =
   "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80";
 
+// Spot map helper: open map directions only when location contains valid coordinates.
+const extractCoordinates = (value: string | null | undefined) => {
+  if (!value?.trim()) return null;
+
+  const suffixMatch = value.match(
+    /\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)$/,
+  );
+  const directMatch = value.match(/^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/);
+  const matched = suffixMatch ?? directMatch;
+  if (!matched) return null;
+
+  const latitude = Number(matched[1]);
+  const longitude = Number(matched[2]);
+  if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
+
+  return { latitude, longitude };
+};
+
 export default function SpotDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -46,6 +66,7 @@ export default function SpotDetailsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [errorMessage] = useState<string | null>(null);
+  const { toast, showToast } = useTopToast();
 
   const galleryImages = [spot?.cover_url, ...spotImages].filter(
     (url): url is string => Boolean(url),
@@ -100,9 +121,39 @@ export default function SpotDetailsScreen() {
     void loadSpot();
   }, [loadSpot]);
 
+  const handleOpenDirections = async () => {
+    const coords = extractCoordinates(spot?.location);
+    if (!coords) {
+      showToast(
+        "Look the related solution: we can't find the place location on map.",
+        "error",
+      );
+      return;
+    }
+
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`;
+
+    try {
+      const supported = await Linking.canOpenURL(mapsUrl);
+      if (!supported) {
+        showToast("Unable to open Google Maps.", "error");
+        return;
+      }
+
+      await Linking.openURL(mapsUrl);
+    } catch {
+      showToast("Unable to open Google Maps.", "error");
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1 bg-white dark:bg-slate-950">
+        <TopToast
+          visible={toast.visible}
+          message={toast.message}
+          variant={toast.variant}
+        />
         <ScrollView contentContainerClassName="pb-28">
           {/* Header */}
           <View className="flex-row items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
@@ -193,7 +244,10 @@ export default function SpotDetailsScreen() {
               />
               <View className="absolute inset-0 bg-white/35 dark:bg-slate-950/45" />
               <View className="absolute inset-x-0 bottom-4 items-center">
-                <Pressable className="flex-row items-center gap-2 rounded-full bg-white px-4 py-2 shadow dark:bg-slate-900">
+                <Pressable
+                  onPress={() => void handleOpenDirections()}
+                  className="flex-row items-center gap-2 rounded-full bg-white px-4 py-2 shadow dark:bg-slate-900"
+                >
                   <Ionicons name="navigate" size={16} color={colors.accent} />
                   <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                     Get Directions
