@@ -3,6 +3,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Switch,
   TextInput,
@@ -17,7 +18,6 @@ import { TopToast } from "../../components/TopToast";
 import { useTheme } from "../../hooks/useTheme";
 import { useTopToast } from "../../hooks/useTopToast";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Pressable } from "react-native";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";
@@ -237,7 +237,7 @@ export default function CreateProjectsScreen() {
 
             <View className="mt-6">
               <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                What's it about?
+                What&apos;s it about?
               </AppText>
               <View className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
                 <TextInput

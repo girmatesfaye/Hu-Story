@@ -1,6 +1,7 @@
 import {
   FlatList,
   Image,
+  Pressable,
   ScrollView,
   TouchableOpacity,
   View,
@@ -13,7 +14,6 @@ import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
 import { useTheme } from "../../hooks/useTheme";
-import { Pressable } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useSupabase } from "../../providers/SupabaseProvider";

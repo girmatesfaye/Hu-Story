@@ -1,4 +1,4 @@
-import { Image, ScrollView, TouchableOpacity, View } from "react-native";
+import { ScrollView, TouchableOpacity, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { AppText } from "../../components/AppText";
@@ -411,7 +411,7 @@ export default function NotificationScreen() {
                 />
               </View>
               <AppText className="mt-3 text-sm text-slate-400 dark:text-slate-500">
-                You're all caught up!
+                You&apos;re all caught up!
               </AppText>
             </View>
           ) : null}

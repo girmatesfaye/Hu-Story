@@ -1,4 +1,10 @@
-import { ScrollView, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -7,7 +13,6 @@ import { FetchErrorModal } from "../../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../../components/SkeletonBlock";
 import { useTheme } from "../../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Pressable } from "react-native";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import { useSupabase } from "../../../providers/SupabaseProvider";
@@ -193,7 +198,7 @@ export default function EditProjectsScreen() {
 
               <View className="mt-6">
                 <AppText className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  What's it about?
+                  What&apos;s it about?
                 </AppText>
                 <View className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
                   <TextInput
