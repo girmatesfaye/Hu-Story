@@ -232,6 +232,13 @@ export default function ProfileTabScreen() {
     void loadStats();
   }, [loadStats]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadStats();
+      return undefined;
+    }, [loadStats]),
+  );
+
   const loadSection = useCallback(async () => {
     if (!session?.user) {
       setIsLoadingList(false);
@@ -309,6 +316,13 @@ export default function ProfileTabScreen() {
   useEffect(() => {
     void loadSection();
   }, [loadSection]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadSection();
+      return undefined;
+    }, [loadSection]),
+  );
 
   const handleRetryData = useCallback(async () => {
     setFetchError(null);
