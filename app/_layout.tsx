@@ -107,6 +107,7 @@ function RootNavigator() {
           name="events/create-events"
           options={{ headerShown: false }}
         />
+        <Stack.Screen name="events/edit/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="spots/[id]" options={{ headerShown: false }} />
         <Stack.Screen
           name="spots/create-spots"

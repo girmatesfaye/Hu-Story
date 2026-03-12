@@ -110,6 +110,7 @@ export default function ProfileTabScreen() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const loadProfile = useCallback(async () => {
@@ -324,6 +325,7 @@ export default function ProfileTabScreen() {
     if (!deleteTarget || !session?.user) return;
 
     setIsDeleting(true);
+    setDeleteError(null);
 
     let error: { message: string } | null = null;
 
@@ -331,17 +333,38 @@ export default function ProfileTabScreen() {
       const { error: rpcError } = await supabase.rpc("delete_my_spot", {
         p_spot_id: deleteTarget.id,
       });
-      error = rpcError;
+      if (rpcError) {
+        const { error: deleteErrorFallback } = await supabase
+          .from("spots")
+          .delete()
+          .eq("id", deleteTarget.id)
+          .eq("user_id", session.user.id);
+        error = deleteErrorFallback;
+      }
     } else if (deleteTarget.type === "events") {
       const { error: rpcError } = await supabase.rpc("delete_my_event", {
         p_event_id: deleteTarget.id,
       });
-      error = rpcError;
+      if (rpcError) {
+        const { error: deleteErrorFallback } = await supabase
+          .from("events")
+          .delete()
+          .eq("id", deleteTarget.id)
+          .eq("user_id", session.user.id);
+        error = deleteErrorFallback;
+      }
     } else if (deleteTarget.type === "projects") {
       const { error: rpcError } = await supabase.rpc("delete_my_project", {
         p_project_id: deleteTarget.id,
       });
-      error = rpcError;
+      if (rpcError) {
+        const { error: deleteErrorFallback } = await supabase
+          .from("projects")
+          .delete()
+          .eq("id", deleteTarget.id)
+          .eq("user_id", session.user.id);
+        error = deleteErrorFallback;
+      }
     } else {
       const { error: deleteError } = await supabase
         .from(deleteTarget.type)
@@ -353,6 +376,7 @@ export default function ProfileTabScreen() {
 
     if (error) {
       setListError(error.message);
+      setDeleteError(error.message);
       setIsDeleting(false);
       return;
     }
@@ -376,6 +400,7 @@ export default function ProfileTabScreen() {
     }));
 
     setListError(null);
+    setDeleteError(null);
     setIsDeleting(false);
     setDeleteTarget(null);
   };
@@ -950,10 +975,7 @@ export default function ProfileTabScreen() {
                         <TouchableOpacity
                           accessibilityRole="button"
                           onPress={() =>
-                            router.push({
-                              pathname: "/events/create-events",
-                              params: { id: event.id },
-                            })
+                            router.push(`/events/edit/${event.id}`)
                           }
                         >
                           <MaterialIcons
@@ -1102,10 +1124,18 @@ export default function ProfileTabScreen() {
                 ? `Delete "${deleteTarget.title}"? This cannot be undone.`
                 : ""}
             </AppText>
+            {deleteError ? (
+              <AppText className="mt-2 text-xs text-red-500">
+                {deleteError}
+              </AppText>
+            ) : null}
             <View className="mt-5 flex-row items-center gap-3">
               <TouchableOpacity
                 accessibilityRole="button"
-                onPress={() => setDeleteTarget(null)}
+                onPress={() => {
+                  setDeleteError(null);
+                  setDeleteTarget(null);
+                }}
                 className="flex-1 items-center justify-center rounded-xl border border-slate-200 py-3 dark:border-slate-800"
               >
                 <AppText className="text-sm font-semibold text-slate-600 dark:text-slate-200">

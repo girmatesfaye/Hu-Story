@@ -1,18 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Image,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  View,
-} from "react-native";
+import { Image, Linking, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
+import { TopToast } from "../../components/TopToast";
+import { useTopToast } from "../../hooks/useTopToast";
 import { useTheme } from "../../hooks/useTheme";
 import Feather from "@expo/vector-icons/Feather";
 import { supabase } from "../../lib/supabase";
@@ -91,22 +86,10 @@ const getDirectionsUrl = (location: string | null, address: string | null) => {
   const fromAddress = extractCoordinates(address);
   const coords = fromLocation ?? fromAddress;
 
-  if (coords) {
-    if (Platform.OS === "ios") {
-      return `http://maps.apple.com/?ll=${coords.latitude},${coords.longitude}`;
-    }
+  if (!coords) return null;
 
-    return `geo:${coords.latitude},${coords.longitude}?q=${coords.latitude},${coords.longitude}`;
-  }
-
-  const query = [address, location].filter(Boolean).join(", ").trim();
-  if (!query) return null;
-
-  if (Platform.OS === "ios") {
-    return `http://maps.apple.com/?q=${encodeURIComponent(query)}`;
-  }
-
-  return `geo:0,0?q=${encodeURIComponent(query)}`;
+  // Open Google Maps only for map-resolved coordinate locations.
+  return `https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`;
 };
 
 const fallbackEventImage =
@@ -133,6 +116,7 @@ export default function EventDetailsScreen() {
   const [isGoing, setIsGoing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const { toast, showToast } = useTopToast();
 
   const directionsUrl = useMemo(
     () => getDirectionsUrl(event?.location ?? null, event?.address ?? null),
@@ -298,19 +282,22 @@ export default function EventDetailsScreen() {
   // Get directions action: open native map directions with event location query.
   const handleOpenDirections = async () => {
     if (!directionsUrl) {
-      setErrorMessage("Location is not available for directions.");
+      showToast(
+        "Look the related solution: we can't find the place location on map.",
+        "error",
+      );
       return;
     }
 
     try {
       const supported = await Linking.canOpenURL(directionsUrl);
       if (!supported) {
-        setErrorMessage("Unable to open map directions.");
+        showToast("Unable to open Google Maps.", "error");
         return;
       }
       await Linking.openURL(directionsUrl);
     } catch {
-      setErrorMessage("Unable to open map directions.");
+      showToast("Unable to open Google Maps.", "error");
     }
   };
 
@@ -327,6 +314,11 @@ export default function EventDetailsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
       <View className="flex-1 bg-white dark:bg-slate-950">
+        <TopToast
+          visible={toast.visible}
+          message={toast.message}
+          variant={toast.variant}
+        />
         <ScrollView contentContainerClassName="pb-28">
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
@@ -490,8 +482,9 @@ export default function EventDetailsScreen() {
                           {formatLocationLabel(event?.location)}
                         </AppText>
                         <AppText className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                          {locationCoordinates.latitude.toFixed(5)},{" "}
-                          {locationCoordinates.longitude.toFixed(5)}
+                          {directionsUrl
+                            ? `${locationCoordinates.latitude.toFixed(5)}, ${locationCoordinates.longitude.toFixed(5)}`
+                            : "Map coordinates unavailable"}
                         </AppText>
                       </View>
                       <View className="h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-slate-800">

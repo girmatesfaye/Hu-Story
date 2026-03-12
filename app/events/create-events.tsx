@@ -33,55 +33,75 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 import { trackSmartlookEvent } from "../../lib/smartlook";
 
 type PickerTarget = "startDate" | "startTime" | "endDate" | "endTime";
-const HAWASSA_REGION_LABEL = "Hawassa, Sidama, Ethiopia";
 
-// Region guard: normalize resolved addresses to Hawassa/Sidama/Ethiopia for consistent location data.
-const resolveHawassaLabel = (
+const removePlusCode = (value: string) =>
+  value
+    .replace(/^[A-Z0-9]{3,}\+[A-Z0-9]{2,}[\.,]?\s*/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+const normalizePlaceFragment = (value: string | null | undefined) => {
+  if (!value) return "";
+  return removePlusCode(value)
+    .replace(/\bregion\b/gi, "")
+    .replace(/\bSidama\b/gi, "")
+    .replace(/\bEthiopi(?:a)?\b/gi, "")
+    .replace(/^,\s*|,\s*$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
+const isGenericArea = (value: string) => {
+  const normalized = value.toLowerCase().trim();
+  return (
+    normalized === "hawassa" ||
+    normalized === "awassa" ||
+    normalized === "sidama" ||
+    normalized === "region hawassa"
+  );
+};
+
+const isPostalOrCodeLike = (value: string) => {
+  const normalized = value.trim();
+  return (
+    /^\d{3,}$/.test(normalized) ||
+    /^[A-Z0-9]{3,}\+[A-Z0-9]{2,}$/i.test(normalized)
+  );
+};
+
+const isUsefulAreaName = (value: string) => {
+  const cleaned = normalizePlaceFragment(value);
+  if (!cleaned) return false;
+  if (isGenericArea(cleaned)) return false;
+  if (isPostalOrCodeLike(cleaned)) return false;
+  return true;
+};
+
+const extractPreferredArea = (
   place: Location.LocationGeocodedAddress | undefined,
-  latitude: number,
-  longitude: number,
 ) => {
-  const country = place?.country?.toLowerCase() ?? "";
-  const normalizedArea = [
-    place?.region,
-    place?.city,
-    place?.district,
-    place?.subregion,
-    place?.name,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+  const geo = (place ?? {}) as Location.LocationGeocodedAddress & {
+    neighborhood?: string;
+    sublocality?: string;
+    route?: string;
+  };
 
-  const isEthiopia = country.includes("ethiopia");
-  const isSidama = normalizedArea.includes("sidama");
-  const isHawassa =
-    normalizedArea.includes("hawassa") || normalizedArea.includes("awassa");
-  const isInTargetRegion = isEthiopia && (isSidama || isHawassa);
+  const candidates = [
+    geo.neighborhood,
+    geo.sublocality,
+    geo.route,
+    geo.district,
+    geo.subregion,
+    geo.street,
+    geo.name,
+  ];
 
-  if (!isInTargetRegion) {
-    return {
-      label: `${HAWASSA_REGION_LABEL} (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
-      isInTargetRegion,
-      isEthiopia,
-    };
+  for (const candidate of candidates) {
+    const cleaned = normalizePlaceFragment(candidate);
+    if (cleaned && isUsefulAreaName(cleaned)) return cleaned;
   }
 
-  const labelParts = [
-    place?.name,
-    place?.street,
-    "Hawassa",
-    "Sidama",
-    "Ethiopia",
-  ]
-    .filter(Boolean)
-    .filter((value, index, array) => array.indexOf(value) === index);
-
-  return {
-    label: labelParts.join(", "),
-    isInTargetRegion,
-    isEthiopia,
-  };
+  return null;
 };
 
 const toIsoWithOffset = (value: Date) => {
@@ -185,6 +205,12 @@ export default function CreateEventScreen() {
   const [isLoadingEvent, setIsLoadingEvent] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const [requiresLandmarkHint, setRequiresLandmarkHint] = useState(false);
+  const [landmarkInput, setLandmarkInput] = useState("");
+  const [selectedCoordinates, setSelectedCoordinates] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -307,7 +333,7 @@ export default function CreateEventScreen() {
     }
   };
 
-  // Safe map integration: request foreground location, reverse geocode, and fill the text location field.
+  // Safe map integration: resolve user-friendly area name from GPS and keep coordinates for directions.
   const handleSelectCurrentLocation = async () => {
     setIsResolvingLocation(true);
 
@@ -326,31 +352,34 @@ export default function CreateEventScreen() {
       });
 
       const { latitude, longitude } = position.coords;
+      setSelectedCoordinates({ latitude, longitude });
+
       const places = await Location.reverseGeocodeAsync({
         latitude,
         longitude,
       });
       const place = places[0];
+      const area = extractPreferredArea(place);
 
-      const { label, isInTargetRegion, isEthiopia } = resolveHawassaLabel(
-        place,
-        latitude,
-        longitude,
-      );
+      if (area) {
+        setLocation(
+          `${area}, Hawassa (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
+        );
+        setRequiresLandmarkHint(false);
+        setLandmarkInput("");
+        showToast("Location selected successfully.", "success");
+      } else {
+        setLocation("");
+        setRequiresLandmarkHint(true);
+        showToast(
+          "This place has no name. Please enter a nearby landmark.",
+          "error",
+        );
+      }
 
-      setLocation(label);
-      showToast(
-        isInTargetRegion
-          ? "Location selected successfully."
-          : isEthiopia
-            ? "Location detected in Ethiopia. Saved in Hawassa format."
-            : "Outside Ethiopia. Saved as Hawassa, Sidama, Ethiopia.",
-        isInTargetRegion || isEthiopia ? "success" : "error",
-      );
       void trackSmartlookEvent("event_location_selected", {
         has_reverse_geocode: Boolean(place),
-        in_target_region: isInTargetRegion,
-        in_ethiopia: isEthiopia,
+        has_area_name: Boolean(area),
       });
     } catch {
       showToast("Unable to fetch your current location.", "error");
@@ -359,6 +388,15 @@ export default function CreateEventScreen() {
       });
     } finally {
       setIsResolvingLocation(false);
+    }
+  };
+
+  const handleLocationChange = (value: string) => {
+    const cleaned = removePlusCode(value);
+    setLocation(cleaned);
+
+    if (cleaned.trim().length > 0 && !isGenericArea(cleaned)) {
+      setRequiresLandmarkHint(false);
     }
   };
 
@@ -463,6 +501,24 @@ export default function CreateEventScreen() {
     const startAtValue = startAt ? toIsoWithOffset(startAt) : null;
     const endAtValue = endAt ? toIsoWithOffset(endAt) : null;
 
+    const cleanedLocation = removePlusCode(location).trim();
+    const cleanedLandmark = removePlusCode(landmarkInput).trim();
+
+    let locationToSave = cleanedLocation;
+    if (requiresLandmarkHint) {
+      if (!cleanedLandmark) {
+        showToast(
+          "This place has no name. Please enter a nearby landmark.",
+          "error",
+        );
+        return;
+      }
+      locationToSave = `Near ${cleanedLandmark}, Hawassa`;
+    } else if (isGenericArea(locationToSave)) {
+      showToast("Please add a specific nearby place.", "error");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const coverUrl = coverImageUri ? await uploadCoverImage() : coverImageUrl;
@@ -480,7 +536,7 @@ export default function CreateEventScreen() {
         .filter(Boolean),
       start_at: startAtValue,
       end_at: endAtValue,
-      location: location.trim() || null,
+      location: locationToSave || null,
       host_name: hostName.trim() || null,
       fee_type: feeType,
       fee_amount: feeType === "paid" ? parsedFee : null,
@@ -512,6 +568,7 @@ export default function CreateEventScreen() {
       {
         fee_type: feeType,
         has_cover: Boolean(coverUrl),
+        has_coordinates: Boolean(selectedCoordinates),
       },
     );
     showToast("Successfully created.", "success");
@@ -710,7 +767,7 @@ export default function CreateEventScreen() {
                         <AppText className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
                           {isResolvingLocation
                             ? "Locating..."
-                            : "Select in Hawassa"}
+                            : "Select on Map"}
                         </AppText>
                       </Pressable>
                     </View>
@@ -720,11 +777,29 @@ export default function CreateEventScreen() {
                         placeholderTextColor={colors.mutedStrong}
                         className="text-sm text-slate-900 dark:text-slate-100"
                         value={location}
-                        onChangeText={setLocation}
+                        onChangeText={handleLocationChange}
                       />
                     </View>
 
-                    <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
+                    {requiresLandmarkHint ? (
+                      <View className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 dark:border-amber-500/40 dark:bg-amber-900/20">
+                        <AppText className="text-xs text-amber-700 dark:text-amber-300">
+                          This place has no name. Please enter a nearby
+                          landmark.
+                        </AppText>
+                        <View className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-2 dark:border-amber-500/50 dark:bg-slate-900">
+                          <TextInput
+                            placeholder="e.g. Hawassa University Main Gate"
+                            placeholderTextColor={colors.mutedStrong}
+                            className="text-sm text-slate-900 dark:text-slate-100"
+                            value={landmarkInput}
+                            onChangeText={setLandmarkInput}
+                          />
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {/* <View className="mt-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
                       <Image
                         source={{
                           uri: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80",
@@ -741,7 +816,8 @@ export default function CreateEventScreen() {
                             color={colors.accent}
                           />
                           <AppText className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                            {location || "Hawassa Main Campus"}
+                            {location ||
+                              "Select on map or type a nearby landmark"}
                           </AppText>
                         </View>
                       </View>
@@ -758,7 +834,7 @@ export default function CreateEventScreen() {
                           color={colors.mutedText}
                         />
                       </View>
-                    </View>
+                    </View> */}
 
                     <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       Organizer
