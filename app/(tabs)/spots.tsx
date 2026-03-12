@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
@@ -130,6 +131,13 @@ export default function SpotsTabScreen() {
   useEffect(() => {
     void loadSpots(true);
   }, [loadSpots]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadSpots(true);
+      return undefined;
+    }, [loadSpots]),
+  );
 
   const visibleSpots = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();

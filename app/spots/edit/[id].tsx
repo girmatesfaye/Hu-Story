@@ -350,179 +350,179 @@ export default function EditSpotScreen() {
               extraScrollHeight={Platform.OS === "android" ? 40 : 20}
               keyboardOpeningTime={0}
             >
-          {isLoading ? (
-            <View className="gap-5">
-              <SkeletonBlock className="h-4 w-28 rounded-md" />
-              <SkeletonBlock className="h-12 w-full rounded-xl" />
-              <SkeletonBlock className="h-4 w-20 rounded-md" />
-              <View className="flex-row flex-wrap gap-2">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <SkeletonBlock
-                    key={`spot-edit-category-${index}`}
-                    className="h-8 w-20 rounded-full"
-                  />
-                ))}
-              </View>
-              <SkeletonBlock className="h-12 w-full rounded-xl" />
-              <SkeletonBlock className="h-[110px] w-full rounded-xl" />
-            </View>
-          ) : (
-            <>
-              <AppText className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Name of the spot
-              </AppText>
-              <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <TextInput
-                  placeholder="e.g. Library Cafe"
-                  placeholderTextColor={colors.mutedStrong}
-                  className="text-sm text-slate-900 dark:text-slate-100"
-                  value={name}
-                  onChangeText={setName}
-                  editable={!isLoading}
-                />
-              </View>
-
-              <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Category
-              </AppText>
-              <View className="mt-3 flex-row flex-wrap gap-2">
-                {SPOT_CATEGORIES.map((option) => (
-                  <Pressable
-                    key={option}
-                    onPress={() => setSelectedCategory(option)}
-                    className={`rounded-full border px-3 py-1.5 ${
-                      option === selectedCategory
-                        ? "border-green-600 bg-green-600"
-                        : "border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900"
-                    }`}
-                  >
-                    <AppText
-                      className={`text-xs font-semibold ${
-                        option === selectedCategory
-                          ? "text-white"
-                          : "text-slate-600 dark:text-slate-300"
-                      }`}
-                    >
-                      {option}
-                    </AppText>
-                  </Pressable>
-                ))}
-              </View>
-
-              <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Where is it?
-              </AppText>
-              <View className="mt-2 flex-row items-center gap-3">
-                <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <Ionicons
-                    name="location-outline"
-                    size={16}
-                    color={colors.mutedText}
-                  />
-                  <TextInput
-                    placeholder="e.g. Main Campus"
-                    placeholderTextColor={colors.mutedStrong}
-                    className="flex-1 text-sm text-slate-900 dark:text-slate-100"
-                    value={location}
-                    onChangeText={handleLocationChange}
-                    editable={!isLoading}
-                  />
+              {isLoading ? (
+                <View className="gap-5">
+                  <SkeletonBlock className="h-4 w-28 rounded-md" />
+                  <SkeletonBlock className="h-12 w-full rounded-xl" />
+                  <SkeletonBlock className="h-4 w-20 rounded-md" />
+                  <View className="flex-row flex-wrap gap-2">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <SkeletonBlock
+                        key={`spot-edit-category-${index}`}
+                        className="h-8 w-20 rounded-full"
+                      />
+                    ))}
+                  </View>
+                  <SkeletonBlock className="h-12 w-full rounded-xl" />
+                  <SkeletonBlock className="h-[110px] w-full rounded-xl" />
                 </View>
-                <Pressable
-                  onPress={() => void handleSelectCurrentLocation()}
-                  disabled={isResolvingLocation || isLoading}
-                  className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <Ionicons name="map" size={18} color={colors.accent} />
-                </Pressable>
-              </View>
-
-              {requiresLandmarkHint ? (
-                <View className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 dark:border-amber-500/40 dark:bg-amber-900/20">
-                  <AppText className="text-xs text-amber-700 dark:text-amber-300">
-                    This place has no name. Please enter a nearby landmark.
+              ) : (
+                <>
+                  <AppText className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Name of the spot
                   </AppText>
-                  <View className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-2 dark:border-amber-500/50 dark:bg-slate-900">
+                  <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <TextInput
-                      placeholder="e.g. Hawassa University Main Gate"
+                      placeholder="e.g. Library Cafe"
                       placeholderTextColor={colors.mutedStrong}
                       className="text-sm text-slate-900 dark:text-slate-100"
-                      value={landmarkInput}
-                      onChangeText={setLandmarkInput}
+                      value={name}
+                      onChangeText={setName}
                       editable={!isLoading}
                     />
                   </View>
-                </View>
+
+                  <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Category
+                  </AppText>
+                  <View className="mt-3 flex-row flex-wrap gap-2">
+                    {SPOT_CATEGORIES.map((option) => (
+                      <Pressable
+                        key={option}
+                        onPress={() => setSelectedCategory(option)}
+                        className={`rounded-full border px-3 py-1.5 ${
+                          option === selectedCategory
+                            ? "border-green-600 bg-green-600"
+                            : "border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900"
+                        }`}
+                      >
+                        <AppText
+                          className={`text-xs font-semibold ${
+                            option === selectedCategory
+                              ? "text-white"
+                              : "text-slate-600 dark:text-slate-300"
+                          }`}
+                        >
+                          {option}
+                        </AppText>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Where is it?
+                  </AppText>
+                  <View className="mt-2 flex-row items-center gap-3">
+                    <View className="flex-1 flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                      <Ionicons
+                        name="location-outline"
+                        size={16}
+                        color={colors.mutedText}
+                      />
+                      <TextInput
+                        placeholder="e.g. Main Campus"
+                        placeholderTextColor={colors.mutedStrong}
+                        className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                        value={location}
+                        onChangeText={handleLocationChange}
+                        editable={!isLoading}
+                      />
+                    </View>
+                    <Pressable
+                      onPress={() => void handleSelectCurrentLocation()}
+                      disabled={isResolvingLocation || isLoading}
+                      className="h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <Ionicons name="map" size={18} color={colors.accent} />
+                    </Pressable>
+                  </View>
+
+                  {requiresLandmarkHint ? (
+                    <View className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 dark:border-amber-500/40 dark:bg-amber-900/20">
+                      <AppText className="text-xs text-amber-700 dark:text-amber-300">
+                        This place has no name. Please enter a nearby landmark.
+                      </AppText>
+                      <View className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-2 dark:border-amber-500/50 dark:bg-slate-900">
+                        <TextInput
+                          placeholder="e.g. Hawassa University Main Gate"
+                          placeholderTextColor={colors.mutedStrong}
+                          className="text-sm text-slate-900 dark:text-slate-100"
+                          value={landmarkInput}
+                          onChangeText={setLandmarkInput}
+                          editable={!isLoading}
+                        />
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Fee
+                  </AppText>
+                  <View className="mt-2 flex-row rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
+                    <Pressable
+                      onPress={() => setFeeType("free")}
+                      className={`flex-1 items-center justify-center rounded-lg py-2.5 ${
+                        feeType === "free" ? "bg-green-600" : "bg-transparent"
+                      }`}
+                    >
+                      <AppText
+                        className={`text-sm font-semibold ${
+                          feeType === "free"
+                            ? "text-white"
+                            : "text-slate-500 dark:text-slate-400"
+                        }`}
+                      >
+                        Free
+                      </AppText>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setFeeType("paid")}
+                      className={`flex-1 items-center justify-center rounded-lg py-2.5 ${
+                        feeType === "paid"
+                          ? "bg-white dark:bg-slate-950"
+                          : "bg-transparent"
+                      }`}
+                    >
+                      <AppText
+                        className={`text-sm font-semibold ${
+                          feeType === "paid"
+                            ? "text-slate-900 dark:text-slate-100"
+                            : "text-slate-500 dark:text-slate-400"
+                        }`}
+                      >
+                        Paid
+                      </AppText>
+                    </Pressable>
+                  </View>
+
+                  <View className="mt-6 flex-row items-center gap-2">
+                    <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Spot Description
+                    </AppText>
+                    <AppText className="text-xs text-slate-400 dark:text-slate-500">
+                      (optional)
+                    </AppText>
+                  </View>
+                  <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <TextInput
+                      placeholder="Tell students what makes this place special..."
+                      placeholderTextColor={colors.mutedStrong}
+                      className="min-h-[110px] text-sm text-slate-900 dark:text-slate-100"
+                      multiline
+                      textAlignVertical="top"
+                      value={description}
+                      onChangeText={setDescription}
+                      editable
+                    />
+                  </View>
+                </>
+              )}
+
+              {errorMessage ? (
+                <AppText className="mt-4 text-sm text-red-500">
+                  {errorMessage}
+                </AppText>
               ) : null}
-
-              <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Fee
-              </AppText>
-              <View className="mt-2 flex-row rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
-                <Pressable
-                  onPress={() => setFeeType("free")}
-                  className={`flex-1 items-center justify-center rounded-lg py-2.5 ${
-                    feeType === "free" ? "bg-green-600" : "bg-transparent"
-                  }`}
-                >
-                  <AppText
-                    className={`text-sm font-semibold ${
-                      feeType === "free"
-                        ? "text-white"
-                        : "text-slate-500 dark:text-slate-400"
-                    }`}
-                  >
-                    Free
-                  </AppText>
-                </Pressable>
-                <Pressable
-                  onPress={() => setFeeType("paid")}
-                  className={`flex-1 items-center justify-center rounded-lg py-2.5 ${
-                    feeType === "paid"
-                      ? "bg-white dark:bg-slate-950"
-                      : "bg-transparent"
-                  }`}
-                >
-                  <AppText
-                    className={`text-sm font-semibold ${
-                      feeType === "paid"
-                        ? "text-slate-900 dark:text-slate-100"
-                        : "text-slate-500 dark:text-slate-400"
-                    }`}
-                  >
-                    Paid
-                  </AppText>
-                </Pressable>
-              </View>
-
-              <View className="mt-6 flex-row items-center gap-2">
-                <AppText className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Spot Description
-                </AppText>
-                <AppText className="text-xs text-slate-400 dark:text-slate-500">
-                  (optional)
-                </AppText>
-              </View>
-              <View className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <TextInput
-                  placeholder="Tell students what makes this place special..."
-                  placeholderTextColor={colors.mutedStrong}
-                  className="min-h-[110px] text-sm text-slate-900 dark:text-slate-100"
-                  multiline
-                  textAlignVertical="top"
-                  value={description}
-                  onChangeText={setDescription}
-                  editable
-                />
-              </View>
-            </>
-          )}
-
-          {errorMessage ? (
-            <AppText className="mt-4 text-sm text-red-500">
-              {errorMessage}
-            </AppText>
-          ) : null}
             </KeyboardAwareScrollView>
 
             <View

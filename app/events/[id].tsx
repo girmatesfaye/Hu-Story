@@ -3,6 +3,7 @@ import { Image, Linking, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
@@ -202,6 +203,14 @@ export default function EventDetailsScreen() {
     void loadEvent();
     void loadInteractionStatus();
   }, [loadEvent, loadInteractionStatus]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadEvent();
+      void loadInteractionStatus();
+      return undefined;
+    }, [loadEvent, loadInteractionStatus]),
+  );
 
   const handleGoing = async () => {
     if (!event || isUpdating || isGoing) return;

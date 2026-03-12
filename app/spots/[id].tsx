@@ -3,6 +3,7 @@ import { Image, Linking, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { AppText } from "../../components/AppText";
 import { FetchErrorModal } from "../../components/FetchErrorModal";
 import { SkeletonBlock } from "../../components/SkeletonBlock";
@@ -120,6 +121,13 @@ export default function SpotDetailsScreen() {
   useEffect(() => {
     void loadSpot();
   }, [loadSpot]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadSpot();
+      return undefined;
+    }, [loadSpot]),
+  );
 
   const handleOpenDirections = async () => {
     const coords = extractCoordinates(spot?.location);
