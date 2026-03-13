@@ -20,8 +20,17 @@ export default function SplashScreen() {
     const timeout = setTimeout(() => {
       const route = async () => {
         if (session) {
-          const isAdmin = await isAdminUser();
-          router.replace(isAdmin ? "/admin" : "/(tabs)/rants");
+          try {
+            const isAdmin = await Promise.race<boolean>([
+              isAdminUser(),
+              new Promise<boolean>((resolve) => {
+                setTimeout(() => resolve(false), 5000);
+              }),
+            ]);
+            router.replace(isAdmin ? "/admin" : "/(tabs)/rants");
+          } catch {
+            router.replace("/(tabs)/rants");
+          }
           return;
         }
 

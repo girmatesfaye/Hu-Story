@@ -47,13 +47,31 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (isMounted) {
+    const bootstrapTimeout = setTimeout(() => {
+      if (!isMounted) return;
+      // Fail open so release builds do not stay on splash forever.
+      setIsLoading(false);
+    }, 8000);
+
+    const bootstrapSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!isMounted) return;
         setSession(data.session ?? null);
         hadSessionRef.current = Boolean(data.session);
-        setIsLoading(false);
+      } catch {
+        if (!isMounted) return;
+        setSession(null);
+        hadSessionRef.current = false;
+      } finally {
+        if (isMounted) {
+          clearTimeout(bootstrapTimeout);
+          setIsLoading(false);
+        }
       }
-    });
+    };
+
+    void bootstrapSession();
 
     const {
       data: { subscription },
@@ -72,6 +90,7 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
 
     return () => {
       isMounted = false;
+      clearTimeout(bootstrapTimeout);
       subscription.unsubscribe();
     };
   }, []);
