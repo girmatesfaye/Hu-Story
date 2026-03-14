@@ -1,10 +1,10 @@
+import "react-native-reanimated";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
-import "react-native-reanimated";
 import "../global.css";
 import { useTheme } from "../hooks/useTheme";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { SupabaseProvider, useSupabase } from "../providers/SupabaseProvider";
@@ -22,16 +22,34 @@ export const unstable_settings = {
 void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     LexendRegular: require("../assets/fonts/Lexend-Regular.ttf"),
   });
+  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
-    if (fontsLoaded) {
-      void SplashScreen.hideAsync();
+    if (fontsLoaded || fontError) {
+      setAppReady(true);
+      return;
     }
-  }, [fontsLoaded]);
-  if (!fontsLoaded) return null;
+
+    const timeout = setTimeout(() => {
+      // Avoid permanent native splash if font load stalls in release.
+      setAppReady(true);
+    }, 4000);
+
+    return () => clearTimeout(timeout);
+  }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    if (!appReady) return;
+
+    void SplashScreen.hideAsync().catch(() => {
+      // Ignore hide errors and continue rendering app shell.
+    });
+  }, [appReady]);
+
+  if (!appReady) return null;
   return (
     <SupabaseProvider>
       <RootNavigator />
@@ -107,7 +125,10 @@ function RootNavigator() {
           name="events/create-events"
           options={{ headerShown: false }}
         />
-        <Stack.Screen name="events/edit/[id]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="events/edit/[id]"
+          options={{ headerShown: false }}
+        />
         <Stack.Screen name="spots/[id]" options={{ headerShown: false }} />
         <Stack.Screen
           name="spots/create-spots"
