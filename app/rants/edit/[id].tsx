@@ -18,11 +18,15 @@ type RantRow = {
   content: string;
 };
 
+type RantCategory = (typeof RANT_CATEGORIES)[number];
+
 export default function EditRantScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { session } = useSupabase();
-  const [activeCategory, setActiveCategory] = useState(RANT_CATEGORIES[0]);
+  const [activeCategory, setActiveCategory] = useState<RantCategory>(
+    RANT_CATEGORIES[0],
+  );
   const [text, setText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,7 +60,13 @@ export default function EditRantScreen() {
         if (session?.user?.id && rant.user_id !== session.user.id) {
           setFetchError("You do not have permission to edit this rant.");
         }
-        setActiveCategory(rant.category ?? RANT_CATEGORIES[0]);
+        const normalizedCategory = RANT_CATEGORIES.includes(
+          rant.category as RantCategory,
+        )
+          ? (rant.category as RantCategory)
+          : RANT_CATEGORIES[0];
+
+        setActiveCategory(normalizedCategory);
         setText(rant.content ?? "");
       }
 
