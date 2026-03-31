@@ -43,7 +43,3 @@ app-example
 /ios
 /android
 
-# local Android/Gradle cache homes
-.android-home/
-.android-user-home/
-.gradle-user-home/
