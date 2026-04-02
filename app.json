@@ -51,7 +51,12 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "extra": {},
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "51d4d850-cbeb-4105-92ac-47787653588d"
+      }
+    },
     "owner": "girmatesefaye"
   }
 }
