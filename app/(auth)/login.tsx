@@ -6,7 +6,11 @@ import { useState } from "react";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { supabase } from "../../lib/supabase";
+import {
+  supabase,
+  hasSupabaseEnv,
+  SUPABASE_CONFIG_ERROR_MESSAGE,
+} from "../../lib/supabase";
 import { isAdminUser } from "../../constants/admin";
 import { trackSmartlookEvent } from "../../lib/smartlook";
 
@@ -22,6 +26,11 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     // Smartlook phase-1 integration: log auth attempts and outcomes.
     void trackSmartlookEvent("auth_login_attempt");
+
+    if (!hasSupabaseEnv) {
+      setErrorMessage(SUPABASE_CONFIG_ERROR_MESSAGE);
+      return;
+    }
 
     if (!email.trim() || !password) {
       setErrorMessage("Enter your email and password.");

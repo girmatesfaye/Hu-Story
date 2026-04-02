@@ -6,7 +6,11 @@ import { useState } from "react";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { supabase } from "../../lib/supabase";
+import {
+  supabase,
+  hasSupabaseEnv,
+  SUPABASE_CONFIG_ERROR_MESSAGE,
+} from "../../lib/supabase";
 import { trackSmartlookEvent } from "../../lib/smartlook";
 export default function RegisterScreen() {
   const { colors, statusBarStyle } = useTheme();
@@ -34,6 +38,11 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     // Smartlook phase-1 integration: log registration attempts and outcomes.
     void trackSmartlookEvent("auth_register_attempt", { campus });
+
+    if (!hasSupabaseEnv) {
+      setErrorMessage(SUPABASE_CONFIG_ERROR_MESSAGE);
+      return;
+    }
 
     if (!agreed) {
       setErrorMessage("Please agree to the campus rules to continue.");

@@ -5,10 +5,13 @@ import { Platform } from "react-native";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+export const hasSupabaseEnv = Boolean(supabaseUrl && supabaseAnonKey);
+export const SUPABASE_CONFIG_ERROR_MESSAGE =
+  "This build is missing Supabase config. Rebuild with EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.";
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!hasSupabaseEnv) {
   console.warn(
-    "Supabase env vars missing. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.",
+    SUPABASE_CONFIG_ERROR_MESSAGE,
   );
 }
 
@@ -29,6 +32,13 @@ const authConfig = isWeb
       detectSessionInUrl: false,
     };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: authConfig,
-});
+const fallbackSupabaseUrl = "https://example.invalid";
+const fallbackSupabaseAnonKey = "public-anon-key";
+
+export const supabase = createClient(
+  hasSupabaseEnv ? supabaseUrl : fallbackSupabaseUrl,
+  hasSupabaseEnv ? supabaseAnonKey : fallbackSupabaseAnonKey,
+  {
+    auth: authConfig,
+  },
+);

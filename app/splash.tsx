@@ -8,14 +8,19 @@ import { useTheme } from "../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSupabase } from "../providers/SupabaseProvider";
 import { isAdminUser } from "../constants/admin";
+import {
+  hasSupabaseEnv,
+  SUPABASE_CONFIG_ERROR_MESSAGE,
+} from "../lib/supabase";
 
 export default function SplashScreen() {
   const { colors, statusBarStyle } = useTheme();
   const router = useRouter();
   const { session, isLoading } = useSupabase();
+  const shouldContinueBoot = !isLoading || !hasSupabaseEnv;
 
   useEffect(() => {
-    if (isLoading) return;
+    if (!shouldContinueBoot) return;
 
     const timeout = setTimeout(() => {
       const route = async () => {
@@ -34,14 +39,14 @@ export default function SplashScreen() {
           return;
         }
 
-        router.replace("../(auth)/register");
+        router.replace("/(auth)/register");
       };
 
       void route();
     }, 1200);
 
     return () => clearTimeout(timeout);
-  }, [router, session, isLoading]);
+  }, [router, session, shouldContinueBoot]);
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
@@ -78,8 +83,14 @@ export default function SplashScreen() {
           <View className="h-2.5 w-2.5 rounded-full bg-emerald-200 dark:bg-emerald-500/30" />
         </View>
 
+        {!hasSupabaseEnv ? (
+          <AppText className="absolute bottom-20 px-8 text-center text-xs text-red-500 dark:text-red-400">
+            {SUPABASE_CONFIG_ERROR_MESSAGE}
+          </AppText>
+        ) : null}
+
         <AppText className="absolute bottom-10 text-xs tracking-[3px] text-slate-400 dark:text-slate-500">
-          V1.0.0 · HAWASSA UNIVERSITY
+          V1.0.0 | HAWASSA UNIVERSITY
         </AppText>
       </View>
     </SafeAreaView>
