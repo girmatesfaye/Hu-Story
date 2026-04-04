@@ -4,7 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import "../global.css";
 import { useTheme } from "../hooks/useTheme";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { SupabaseProvider, useSupabase } from "../providers/SupabaseProvider";
@@ -41,7 +41,7 @@ export default function RootLayout() {
     return () => clearTimeout(timeout);
   }, [fontsLoaded, fontError]);
 
-  useEffect(() => {
+  const onLayoutRootView = useCallback(() => {
     if (!appReady) return;
 
     void SplashScreen.hideAsync().catch(() => {
@@ -51,9 +51,11 @@ export default function RootLayout() {
 
   if (!appReady) return null;
   return (
-    <SupabaseProvider>
-      <RootNavigator />
-    </SupabaseProvider>
+    <View className="flex-1" onLayout={onLayoutRootView}>
+      <SupabaseProvider>
+        <RootNavigator />
+      </SupabaseProvider>
+    </View>
   );
 }
 
