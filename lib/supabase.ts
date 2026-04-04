@@ -10,9 +10,7 @@ export const SUPABASE_CONFIG_ERROR_MESSAGE =
   "This build is missing Supabase config. Rebuild with EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.";
 
 if (!hasSupabaseEnv) {
-  console.warn(
-    SUPABASE_CONFIG_ERROR_MESSAGE,
-  );
+  console.warn(SUPABASE_CONFIG_ERROR_MESSAGE);
 }
 
 const isServerRender = typeof window === "undefined";
