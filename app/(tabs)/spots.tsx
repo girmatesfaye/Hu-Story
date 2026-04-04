@@ -41,6 +41,31 @@ type SpotItem = {
 const fallbackSpotImage =
   "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=800&q=80";
 
+function EmptySpotsState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <View className="items-center px-6 py-16">
+      <View className="h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-400/20">
+        <Ionicons name="location-outline" size={28} color="#16a34a" />
+      </View>
+      <AppText className="mt-5 text-center text-lg font-semibold text-slate-900 dark:text-slate-100">
+        No spots yet
+      </AppText>
+      <AppText className="mt-2 text-center text-sm leading-6 text-slate-500 dark:text-slate-400">
+        Share a favorite place so other students can discover it too.
+      </AppText>
+      <Pressable
+        onPress={onCreate}
+        className="mt-6 rounded-full bg-green-600 px-5 py-3"
+        accessibilityRole="button"
+      >
+        <AppText className="text-sm font-semibold text-white">
+          Create Spot
+        </AppText>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function SpotsTabScreen() {
   const PAGE_SIZE = 15;
   const router = useRouter();
@@ -309,6 +334,13 @@ export default function SpotsTabScreen() {
               flatListRef.current?.scrollToIndex({ index, animated: true });
             }, 120);
           }}
+          ListEmptyComponent={
+            errorMessage ? null : (
+              <EmptySpotsState
+                onCreate={() => router.push("/spots/create-spots")}
+              />
+            )
+          }
           ListHeaderComponent={
             <>
               <TabHeader

@@ -73,6 +73,35 @@ function RantCardSkeleton() {
   );
 }
 
+function EmptyRantsState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <View className="items-center px-6 py-16">
+      <View className="h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-400/20">
+        <Ionicons
+          name="chatbubble-ellipses-outline"
+          size={28}
+          color="#16a34a"
+        />
+      </View>
+      <AppText className="mt-5 text-center text-lg font-semibold text-slate-900 dark:text-slate-100">
+        No rants yet
+      </AppText>
+      <AppText className="mt-2 text-center text-sm leading-6 text-slate-500 dark:text-slate-400">
+        Start the conversation and be the first to post in this feed.
+      </AppText>
+      <Pressable
+        onPress={onCreate}
+        className="mt-6 rounded-full bg-green-600 px-5 py-3"
+        accessibilityRole="button"
+      >
+        <AppText className="text-sm font-semibold text-white">
+          Create Rant
+        </AppText>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function RantsScreen() {
   const PAGE_SIZE = 15;
   const router = useRouter();
@@ -698,11 +727,9 @@ export default function RantsScreen() {
           ItemSeparatorComponent={() => <View className="h-4" />}
           ListEmptyComponent={
             !isLoading ? (
-              <View className="items-center justify-center py-16">
-                <AppText className="text-sm text-slate-500 dark:text-slate-400 text-center">
-                  No rants in this category yet. Be the first to rant.
-                </AppText>
-              </View>
+              <EmptyRantsState
+                onCreate={() => router.push("/rants/create-rants")}
+              />
             ) : null
           }
           ListFooterComponent={
