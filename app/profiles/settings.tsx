@@ -86,6 +86,19 @@ export default function SettingsScreen() {
 
         <ScrollView contentContainerClassName="px-5 pb-28">
           <AppText className="mt-4 text-xs font-semibold tracking-[2px] text-slate-400 dark:text-slate-500">
+            SUPPORT
+          </AppText>
+          <View className="mt-3 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <SettingRow
+              label="Buy Me Coffee"
+              icon="cafe-outline"
+              iconBg="#FEF3C7"
+              iconColor="#D97706"
+              onPress={() => router.push("../profiles/buy-me-coffee")}
+            />
+          </View>
+
+          <AppText className="mt-4 text-xs font-semibold tracking-[2px] text-slate-400 dark:text-slate-500">
             FOLLOW US
           </AppText>
           <View className="mt-3 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">

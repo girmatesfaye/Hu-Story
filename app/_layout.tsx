@@ -163,6 +163,10 @@ function RootNavigator() {
           name="profiles/settings"
           options={{ headerShown: false }}
         />
+        <Stack.Screen
+          name="profiles/buy-me-coffee"
+          options={{ headerShown: false }}
+        />
       </Stack>
 
       <FetchErrorModal
