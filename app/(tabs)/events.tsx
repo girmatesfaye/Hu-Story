@@ -230,6 +230,31 @@ function EventCardSkeleton() {
   );
 }
 
+function EmptyEventsState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <View className="items-center px-6 py-16">
+      <View className="h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-400/20">
+        <Ionicons name="calendar-outline" size={28} color="#16a34a" />
+      </View>
+      <AppText className="mt-5 text-center text-lg font-semibold text-slate-900 dark:text-slate-100">
+        No events yet
+      </AppText>
+      <AppText className="mt-2 text-center text-sm leading-6 text-slate-500 dark:text-slate-400">
+        Be the first to post an event for the campus community.
+      </AppText>
+      <Pressable
+        onPress={onCreate}
+        className="mt-6 rounded-full bg-green-600 px-5 py-3"
+        accessibilityRole="button"
+      >
+        <AppText className="text-sm font-semibold text-white">
+          Create Event
+        </AppText>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function EventTabScreen() {
   const PAGE_SIZE = 15;
   const router = useRouter();
@@ -613,6 +638,13 @@ export default function EventTabScreen() {
               flatListRef.current?.scrollToIndex({ index, animated: true });
             }, 120);
           }}
+          ListEmptyComponent={
+            errorMessage ? null : (
+              <EmptyEventsState
+                onCreate={() => router.push("/events/create-events")}
+              />
+            )
+          }
           ListHeaderComponent={
             <>
               <TabHeader

@@ -323,6 +323,29 @@ export default function ProjectsTabScreen() {
     }
   };
 
+  const EmptyProjectsState = () => (
+    <View className="items-center px-6 py-16">
+      <View className="h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
+        <Ionicons name="folder-open-outline" size={28} color={colors.accent} />
+      </View>
+      <AppText className="mt-5 text-center text-lg font-semibold text-slate-900 dark:text-slate-100">
+        No projects yet
+      </AppText>
+      <AppText className="mt-2 text-center text-sm leading-6 text-slate-500 dark:text-slate-400">
+        Be the first to share a project with the campus community.
+      </AppText>
+      <Pressable
+        onPress={() => router.push("/projects/create-projects")}
+        className="mt-6 rounded-full bg-green-600 px-5 py-3"
+        accessibilityRole="button"
+      >
+        <AppText className="text-sm font-semibold text-white">
+          Create Project
+        </AppText>
+      </Pressable>
+    </View>
+  );
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
       <StatusBar style={statusBarStyle} translucent={false} />
@@ -442,6 +465,7 @@ export default function ProjectsTabScreen() {
               flatListRef.current?.scrollToIndex({ index, animated: true });
             }, 120);
           }}
+          ListEmptyComponent={errorMessage ? null : <EmptyProjectsState />}
           ListHeaderComponent={
             <>
               <View className="flex-row items-start justify-between">
