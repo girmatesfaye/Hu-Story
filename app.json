@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "scheme": "hustory",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "icon": "./assets/images/app-icon.png",
     "ios": {
       "supportsTablet": true
@@ -52,7 +52,9 @@
       "reactCompiler": true
     },
     "extra": {
-      "router": {},
+      "router": {
+        "sitemap": false
+      },
       "eas": {
         "projectId": "51d4d850-cbeb-4105-92ac-47787653588d"
       }

@@ -43,3 +43,16 @@ app-example
 /ios
 /android
 
+# local gradle caches used for troubleshooting/builds
+.gradle-user-home*/
+
+
+.gradle-user-home/
+.gradle-user-home-fresh/
+.gradel-user-fresh/
+android/
+
+# local generated device artifacts
+device-*.apk
+device-*.bundle
+device-*.config

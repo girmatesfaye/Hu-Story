@@ -2,6 +2,7 @@ import "react-native-reanimated";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import "../global.css";
 import { useTheme } from "../hooks/useTheme";
 import { useCallback, useEffect, useState } from "react";
@@ -15,8 +16,23 @@ import {
   getRouteFromNotificationTarget,
 } from "../lib/notifications";
 import { initSmartlook, trackSmartlookScreen } from "../lib/smartlook";
+import { BootErrorBoundary } from "../components/BootErrorBoundary";
+import { BootDebugOverlay } from "../components/BootDebugOverlay";
+import { AppText } from "../components/AppText";
+import {
+  captureBootError,
+  getBootDiagnosticsState,
+  isBootDiagnosticsEnabled,
+  markBootStage,
+  patchBootState,
+} from "../lib/bootDiagnostics";
 export const unstable_settings = {
-  anchor: "(tabs)",
+  initialRouteName: "splash",
+};
+
+const logBoot = (...args: unknown[]) => {
+  if (!isBootDiagnosticsEnabled()) return;
+  console.log("[BOOT]", ...args);
 };
 
 void SplashScreen.preventAutoHideAsync();
@@ -28,13 +44,36 @@ export default function RootLayout() {
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
+    logBoot("root state", {
+      fontsLoaded,
+      hasFontError: Boolean(fontError),
+      appReady,
+    });
+    patchBootState(
+      {
+        appReady,
+      },
+      "ROOT_STATE",
+    );
+  }, [appReady, fontError, fontsLoaded]);
+
+  useEffect(() => {
     if (fontsLoaded || fontError) {
+      logBoot("font phase completed", {
+        fontsLoaded,
+        hasFontError: Boolean(fontError),
+      });
+      markBootStage(fontError ? "FONT_ERROR" : "FONTS_READY", {
+        hasFontError: Boolean(fontError),
+      });
       setAppReady(true);
       return;
     }
 
     const timeout = setTimeout(() => {
       // Avoid permanent native splash if font load stalls in release.
+      logBoot("font timeout reached, forcing appReady");
+      markBootStage("FONT_TIMEOUT");
       setAppReady(true);
     }, 4000);
 
@@ -44,18 +83,52 @@ export default function RootLayout() {
   const onLayoutRootView = useCallback(() => {
     if (!appReady) return;
 
+    logBoot("root layout mounted, hiding native splash");
+    markBootStage("NATIVE_SPLASH_HIDE_ATTEMPT");
     void SplashScreen.hideAsync().catch(() => {
       // Ignore hide errors and continue rendering app shell.
+      logBoot("hideAsync failed");
+      captureBootError("SplashScreen.hideAsync", "hideAsync failed");
     });
   }, [appReady]);
 
-  if (!appReady) return null;
+  if (!appReady) {
+    const snapshot = getBootDiagnosticsState();
+
+    return (
+      <SafeAreaProvider>
+        <View className="flex-1 items-center justify-center bg-slate-50 px-6 dark:bg-slate-950">
+          <AppText className="text-base font-semibold text-slate-800 dark:text-slate-100">
+            Starting app...
+          </AppText>
+          <AppText className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+            stage={snapshot.stage} appReady={String(snapshot.appReady)}{" "}
+            authLoading=
+            {String(snapshot.authLoading)}
+          </AppText>
+          {isBootDiagnosticsEnabled() ? <BootDebugOverlay /> : null}
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
+  const diagnosticsEnabled = isBootDiagnosticsEnabled();
+
   return (
-    <View className="flex-1" onLayout={onLayoutRootView}>
-      <SupabaseProvider>
-        <RootNavigator />
-      </SupabaseProvider>
-    </View>
+    <SafeAreaProvider>
+      <View className="flex-1" onLayout={onLayoutRootView}>
+        <SupabaseProvider>
+          {diagnosticsEnabled ? (
+            <BootErrorBoundary>
+              <RootNavigator />
+            </BootErrorBoundary>
+          ) : (
+            <RootNavigator />
+          )}
+        </SupabaseProvider>
+        {diagnosticsEnabled ? <BootDebugOverlay /> : null}
+      </View>
+    </SafeAreaProvider>
   );
 }
 
@@ -65,14 +138,29 @@ function RootNavigator() {
   const router = useRouter();
   const pathname = usePathname();
 
+  useEffect(() => {
+    logBoot("navigator route", pathname ?? "(null)");
+    patchBootState(
+      {
+        routePath: pathname ?? null,
+      },
+      "ROUTE_PATH",
+    );
+  }, [pathname]);
+
   // Smartlook phase-1 integration: initialize recording once app shell is mounted.
   useEffect(() => {
-    void initSmartlook();
+    markBootStage("ROOT_NAVIGATOR_MOUNTED");
+    void initSmartlook().catch((error) => {
+      captureBootError("initSmartlook", error);
+    });
   }, []);
 
   // Smartlook phase-1 integration: track route transitions from Expo Router.
   useEffect(() => {
-    void trackSmartlookScreen(pathname);
+    void trackSmartlookScreen(pathname).catch((error) => {
+      captureBootError("trackSmartlookScreen", error);
+    });
   }, [pathname]);
 
   useEffect(() => {
@@ -94,6 +182,12 @@ function RootNavigator() {
       });
 
       if (route) {
+        patchBootState(
+          {
+            routeTarget: route,
+          },
+          "PUSH_NOTIFICATION_ROUTE",
+        );
         router.push(route as never);
       }
     };
