@@ -13,17 +13,6 @@ import {
   registerForPushNotificationsAsync,
 } from "../lib/notifications";
 import { identifySmartlookUser } from "../lib/smartlook";
-import {
-  captureBootError,
-  isBootDiagnosticsEnabled,
-  markBootStage,
-  patchBootState,
-} from "../lib/bootDiagnostics";
-
-const logAuth = (...args: unknown[]) => {
-  if (!isBootDiagnosticsEnabled()) return;
-  console.log("[AUTH]", ...args);
-};
 
 type SupabaseContextValue = {
   session: Session | null;
@@ -57,69 +46,27 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
 
   useEffect(() => {
     let isMounted = true;
-    logAuth("bootstrap start");
-    patchBootState(
-      {
-        authLoading: true,
-      },
-      "AUTH_BOOTSTRAP_START",
-    );
 
     const bootstrapTimeout = setTimeout(() => {
       if (!isMounted) return;
       // Fail open so release builds do not stay on splash forever.
-      logAuth("bootstrap timeout reached, forcing loading=false");
-      markBootStage("AUTH_BOOTSTRAP_TIMEOUT");
       setIsLoading(false);
-      patchBootState(
-        {
-          authLoading: false,
-        },
-        "AUTH_BOOTSTRAP_TIMEOUT_RELEASE",
-      );
     }, 8000);
 
     const bootstrapSession = async () => {
       try {
-        logAuth("getSession begin");
-        markBootStage("AUTH_GETSESSION_BEGIN");
         const { data } = await supabase.auth.getSession();
         if (!isMounted) return;
-        logAuth("getSession success", {
-          hasSession: Boolean(data.session),
-          userId: data.session?.user?.id ?? null,
-        });
-        patchBootState(
-          {
-            hasSession: Boolean(data.session),
-          },
-          "AUTH_GETSESSION_SUCCESS",
-        );
         setSession(data.session ?? null);
         hadSessionRef.current = Boolean(data.session);
-      } catch (error) {
+      } catch {
         if (!isMounted) return;
-        logAuth("getSession failed");
-        captureBootError("supabase.auth.getSession", error);
         setSession(null);
         hadSessionRef.current = false;
-        patchBootState(
-          {
-            hasSession: false,
-          },
-          "AUTH_GETSESSION_FAILED",
-        );
       } finally {
         if (isMounted) {
           clearTimeout(bootstrapTimeout);
-          logAuth("bootstrap finish, loading=false");
           setIsLoading(false);
-          patchBootState(
-            {
-              authLoading: false,
-            },
-            "AUTH_BOOTSTRAP_FINISH",
-          );
         }
       }
     };
@@ -129,16 +76,6 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
-      logAuth("auth state changed", {
-        event,
-        hasSession: Boolean(newSession),
-      });
-      patchBootState(
-        {
-          hasSession: Boolean(newSession),
-        },
-        `AUTH_STATE_${event}`,
-      );
       if (event === "SIGNED_OUT" && hadSessionRef.current) {
         setSessionExpiredMessage("Session expired. Please sign in again.");
       }
@@ -152,8 +89,6 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
     });
 
     return () => {
-      logAuth("provider unmount");
-      markBootStage("AUTH_PROVIDER_UNMOUNT");
       isMounted = false;
       clearTimeout(bootstrapTimeout);
       subscription.unsubscribe();
@@ -174,9 +109,8 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
         await supabase.rpc("upsert_push_token", {
           p_token: token,
         });
-      } catch (error) {
+      } catch {
         // Keep auth/session flow alive even if push registration fails.
-        captureBootError("registerForPushNotificationsAsync", error);
       }
     };
 

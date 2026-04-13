@@ -9,17 +9,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSupabase } from "../providers/SupabaseProvider";
 import { isAdminUser } from "../constants/admin";
 import { hasSupabaseEnv, SUPABASE_CONFIG_ERROR_MESSAGE } from "../lib/supabase";
-import {
-  captureBootError,
-  isBootDiagnosticsEnabled,
-  markBootStage,
-  patchBootState,
-} from "../lib/bootDiagnostics";
-
-const logSplash = (...args: unknown[]) => {
-  if (!isBootDiagnosticsEnabled()) return;
-  console.log("[SPLASH]", ...args);
-};
 
 export default function SplashScreen() {
   const { colors, statusBarStyle } = useTheme();
@@ -28,42 +17,13 @@ export default function SplashScreen() {
   const shouldContinueBoot = !isLoading || !hasSupabaseEnv;
 
   useEffect(() => {
-    logSplash("state", {
-      isLoading,
-      hasSession: Boolean(session),
-      hasSupabaseEnv,
-      shouldContinueBoot,
-    });
-    patchBootState(
-      {
-        authLoading: isLoading,
-        hasSession: Boolean(session),
-        hasSupabaseEnv,
-      },
-      "SPLASH_STATE",
-    );
-  }, [isLoading, session, shouldContinueBoot]);
-
-  useEffect(() => {
     if (!shouldContinueBoot) {
-      logSplash("waiting for bootstrap to continue");
-      markBootStage("SPLASH_WAITING_FOR_AUTH");
       return;
     }
-
-    logSplash("boot unlocked, preparing route decision");
-    markBootStage("SPLASH_ROUTE_DECISION_START");
-
-    const watchdogTimeout = setTimeout(() => {
-      markBootStage("SPLASH_ROUTE_WATCHDOG_TIMEOUT", {
-        hasSession: Boolean(session),
-      });
-    }, 7000);
 
     const timeout = setTimeout(() => {
       const route = async () => {
         if (session) {
-          logSplash("session found, checking admin role");
           try {
             const isAdmin = await Promise.race<boolean>([
               isAdminUser(),
@@ -71,48 +31,22 @@ export default function SplashScreen() {
                 setTimeout(() => resolve(false), 5000);
               }),
             ]);
-            logSplash("routing authenticated user", {
-              isAdmin,
-            });
             const target = isAdmin ? "/admin" : "/(tabs)/rants";
-            patchBootState(
-              {
-                routeTarget: target,
-              },
-              "ROUTE_REPLACE_ATTEMPT",
-            );
             router.replace(target);
           } catch {
-            logSplash("admin lookup failed, fallback route /(tabs)/rants");
-            patchBootState(
-              {
-                routeTarget: "/(tabs)/rants",
-              },
-              "ROUTE_REPLACE_FALLBACK",
-            );
             router.replace("/(tabs)/rants");
           }
           return;
         }
 
-        logSplash("no session, route /(auth)/register");
-        patchBootState(
-          {
-            routeTarget: "/(auth)/register",
-          },
-          "ROUTE_REPLACE_NO_SESSION",
-        );
         router.replace("/(auth)/register");
       };
 
-      void route().catch((error) => {
-        captureBootError("SplashScreen.route", error);
-      });
+      void route();
     }, 1200);
 
     return () => {
       clearTimeout(timeout);
-      clearTimeout(watchdogTimeout);
     };
   }, [router, session, shouldContinueBoot]);
 
@@ -160,13 +94,6 @@ export default function SplashScreen() {
         <AppText className="absolute bottom-10 text-xs tracking-[3px] text-slate-400 dark:text-slate-500">
           V1.0.0 | HAWASSA UNIVERSITY
         </AppText>
-
-        {isBootDiagnosticsEnabled() ? (
-          <AppText className="absolute bottom-4 px-6 text-center text-[10px] text-emerald-700 dark:text-emerald-400">
-            DEBUG boot: loading={String(isLoading)} session=
-            {String(Boolean(session))} env={String(hasSupabaseEnv)}
-          </AppText>
-        ) : null}
       </View>
     </SafeAreaView>
   );
