@@ -9,10 +9,10 @@ import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { SupabaseProvider, useSupabase } from "../providers/SupabaseProvider";
 import { FetchErrorModal } from "../components/FetchErrorModal";
-import * as Notifications from "expo-notifications";
 import {
   canUseRemotePushNotifications,
   getRouteFromNotificationTarget,
+  subscribeToNotificationResponses,
 } from "../lib/notifications";
 import { initSmartlook, trackSmartlookScreen } from "../lib/smartlook";
 import { AppText } from "../components/AppText";
@@ -93,18 +93,29 @@ function RootNavigator() {
     if (!canUseRemotePushNotifications()) return;
 
     const handleResponse = (
-      response: Notifications.NotificationResponse | null,
+      response: {
+        notification?: {
+          request?: {
+            content?: {
+              data?: Record<string, unknown>;
+            };
+          };
+        };
+      } | null,
     ) => {
       if (!response) return;
-      const data = response.notification.request.content.data as
-        | Record<string, string | undefined>
-        | undefined;
+
+      const rawData = response.notification?.request?.content?.data;
+      const data = rawData as Record<string, unknown> | undefined;
+
+      const asString = (value: unknown) =>
+        typeof value === "string" ? value : undefined;
 
       const route = getRouteFromNotificationTarget({
-        route: data?.route,
-        deep_link: data?.deep_link,
-        target_type: data?.target_type,
-        target_id: data?.target_id,
+        route: asString(data?.route),
+        deep_link: asString(data?.deep_link),
+        target_type: asString(data?.target_type),
+        target_id: asString(data?.target_id),
       });
 
       if (route) {
@@ -112,16 +123,21 @@ function RootNavigator() {
       }
     };
 
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        handleResponse(response);
-      },
-    );
+    let isMounted = true;
+    let unsubscribe: (() => void) | null = null;
 
-    void Notifications.getLastNotificationResponseAsync().then(handleResponse);
+    void subscribeToNotificationResponses(handleResponse).then((cleanup) => {
+      if (!isMounted) {
+        cleanup();
+        return;
+      }
+
+      unsubscribe = cleanup;
+    });
 
     return () => {
-      subscription.remove();
+      isMounted = false;
+      unsubscribe?.();
     };
   }, [router]);
 

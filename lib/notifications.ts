@@ -1,18 +1,22 @@
 import { Platform } from "react-native";
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { isRunningInExpoGo } from "expo";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+type NotificationsModule = typeof import("expo-notifications");
+type NotificationResponseLike = {
+  notification?: {
+    request?: {
+      content?: {
+        data?: Record<string, unknown>;
+      };
+    };
+  };
+};
+
+let notificationsModulePromise: Promise<NotificationsModule | null> | null =
+  null;
+let notificationHandlerConfigured = false;
 
 const getProjectId = () => {
   return (
@@ -30,8 +34,38 @@ const isExpoGo = () =>
 export const canUseRemotePushNotifications = () =>
   !isExpoGo() && Device.isDevice;
 
-export async function registerForPushNotificationsAsync() {
+async function getNotificationsModule() {
   if (!canUseRemotePushNotifications()) return null;
+
+  if (!notificationsModulePromise) {
+    notificationsModulePromise = import("expo-notifications").catch(() => null);
+  }
+
+  return notificationsModulePromise;
+}
+
+async function ensureNotificationHandler() {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications || notificationHandlerConfigured) return;
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+
+  notificationHandlerConfigured = true;
+}
+
+export async function registerForPushNotificationsAsync() {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return null;
+
+  await ensureNotificationHandler();
 
   const existingPermissions = await Notifications.getPermissionsAsync();
   let finalStatus = existingPermissions.status;
@@ -73,6 +107,9 @@ export async function registerForPushNotificationsAsync() {
 }
 
 export async function syncAppBadgeCount(unreadCount: number) {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return;
+
   const safeCount = Math.max(unreadCount, 0);
   try {
     await Notifications.setBadgeCountAsync(safeCount);
@@ -87,6 +124,29 @@ type NotificationTargetInput = {
   target_type?: string | null;
   target_id?: string | null;
 };
+
+export async function subscribeToNotificationResponses(
+  onResponse: (response: NotificationResponseLike | null) => void,
+) {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return () => undefined;
+
+  await ensureNotificationHandler();
+
+  const subscription = Notifications.addNotificationResponseReceivedListener(
+    (response) => {
+      onResponse(response as NotificationResponseLike);
+    },
+  );
+
+  void Notifications.getLastNotificationResponseAsync().then((response) => {
+    onResponse(response as NotificationResponseLike | null);
+  });
+
+  return () => {
+    subscription.remove();
+  };
+}
 
 export function getRouteFromNotificationTarget(
   input?: NotificationTargetInput | null,
