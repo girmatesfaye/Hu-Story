@@ -45,7 +45,9 @@ export default function EditProfileScreen() {
         .maybeSingle();
 
       if (isMounted) {
-        setFullName(data?.full_name ?? "");
+        setFullName(
+          data?.full_name ?? session.user.user_metadata?.full_name ?? "",
+        );
         setUsername(data?.username ?? "");
         setBio(data?.bio ?? "");
         setCampus(

@@ -2,7 +2,7 @@ import { ScrollView, TextInput, TouchableOpacity, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppText } from "../../components/AppText";
 import { useTheme } from "../../hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,8 +15,10 @@ import { trackSmartlookEvent } from "../../lib/smartlook";
 export default function RegisterScreen() {
   const { colors, statusBarStyle } = useTheme();
   const router = useRouter();
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -35,6 +37,14 @@ export default function RegisterScreen() {
     "BENSA",
   ];
 
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleRegister = async () => {
     // Smartlook phase-1 integration: log registration attempts and outcomes.
     void trackSmartlookEvent("auth_register_attempt", { campus });
@@ -52,8 +62,8 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (!email.trim() || !password) {
-      setErrorMessage("Enter your email and password.");
+    if (!fullName.trim() || !email.trim() || !password) {
+      setErrorMessage("Enter your full name, email, and password.");
       void trackSmartlookEvent("auth_register_validation_failed", {
         reason: "missing_credentials",
       });
@@ -63,12 +73,19 @@ export default function RegisterScreen() {
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+
+    if (redirectTimerRef.current) {
+      clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
+
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
           data: {
+            full_name: fullName.trim(),
             campus,
           },
         },
@@ -85,11 +102,21 @@ export default function RegisterScreen() {
         return;
       }
 
-      setSuccessMessage("Registration successful! Please Login.");
+      const nextRoute = data.session ? "/(tabs)/rants" : "/(auth)/login";
+
+      setSuccessMessage(
+        data.session
+          ? "Registration successful! Taking you to the home feed..."
+          : "Registration successful! Redirecting to login...",
+      );
       void trackSmartlookEvent("auth_register_success", {
         campus,
         email_domain: email.includes("@") ? email.split("@")[1] : "unknown",
       });
+
+      redirectTimerRef.current = setTimeout(() => {
+        router.replace(nextRoute as never);
+      }, 900);
     } catch {
       setErrorMessage("Registration failed. Please try again.");
       void trackSmartlookEvent("auth_register_failed", {
@@ -172,6 +199,23 @@ export default function RegisterScreen() {
                     ))}
                   </View>
                 )}
+              </View>
+
+              {/* ---------- CONTACT INFO ---------- */}
+              <View className="mt-6">
+                <AppText className="text-xs font-semibold tracking-[2px] text-slate-400 dark:text-slate-500">
+                  FULL NAME
+                </AppText>
+                <View className="mt-3 flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                  <Ionicons name="person" size={18} color={colors.mutedText} />
+                  <TextInput
+                    placeholder="Your full name"
+                    placeholderTextColor={colors.mutedStrong}
+                    className="flex-1 text-sm text-slate-900 dark:text-slate-100"
+                    value={fullName}
+                    onChangeText={setFullName}
+                  />
+                </View>
               </View>
 
               {/* ---------- CONTACT INFO ---------- */}

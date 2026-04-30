@@ -458,7 +458,7 @@ export default function EditSpotScreen() {
                     ) : null}
 
                     <AppText className="mt-6 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Fee
+                      Fee Type
                     </AppText>
                     <View className="mt-2 flex-row rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
                       <Pressable

@@ -9,6 +9,7 @@ import { supabase } from "../../lib/supabase";
 
 const settingsLinks = {
   tiktok: "https://tiktok.com/@girma_thoughts",
+  youtube: "https://www.youtube.com/@GirmaThoughts",
   twitter: "https://x.com/",
   telegram: "https://t.me/girma_thoughts",
   terms: "https://example.com/terms",
@@ -102,6 +103,14 @@ export default function SettingsScreen() {
             FOLLOW US
           </AppText>
           <View className="mt-3 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <SettingRow
+              label="YouTube"
+              icon="logo-youtube"
+              iconBg="#FEE2E2"
+              iconColor="#EF4444"
+              onPress={() => openUrl(settingsLinks.youtube)}
+            />
+            <View className="h-px bg-slate-100 dark:bg-slate-800" />
             <SettingRow
               label="TikTok"
               icon="logo-tiktok"

@@ -134,9 +134,15 @@ export default function ProfileTabScreen() {
     if (!data) {
       const fallbackCampus =
         session.user.user_metadata?.campus ?? "Hawassa University";
-      const { error: insertError } = await supabase
-        .from("profiles")
-        .insert({ user_id: session.user.id, campus: fallbackCampus });
+      const fallbackFullName =
+        session.user.user_metadata?.full_name ??
+        session.user.user_metadata?.name ??
+        null;
+      const { error: insertError } = await supabase.from("profiles").insert({
+        user_id: session.user.id,
+        full_name: fallbackFullName,
+        campus: fallbackCampus,
+      });
 
       if (insertError) {
         setProfile(null);
@@ -421,6 +427,7 @@ export default function ProfileTabScreen() {
 
   const displayName =
     profile?.full_name?.trim() ||
+    profile?.username?.trim() ||
     session?.user?.email?.split("@")[0] ||
     "Student";
   const displayCampus = profile?.campus ?? "Hawassa University";
